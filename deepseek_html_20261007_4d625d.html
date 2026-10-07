@@ -1,0 +1,2476 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>客户订单统计系统 · 时间统计版</title>
+<style>
+  :root {
+    --primary: #1e5f7a; --primary-dark: #0d445b; --primary-light: #e8f2fa;
+    --accent: #2b7a8c; --bg: #f4f7fc; --border: #d9e5f0;
+    --text: #0b2a4a; --text-muted: #5a7c94;
+    --success: #2e8b57; --warning: #d97706; --danger: #dc2626; --paid: #16a34a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 14px; font-size: 14px; }
+  .app { max-width: 1500px; margin: 0 auto; }
+
+  /* 登录 */
+  .login-overlay { position: fixed; inset: 0; background: linear-gradient(135deg, #0d445b 0%, #1e5f7a 50%, #2b7a8c 100%); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 5000; }
+  .login-overlay.hidden { display: none; }
+  .login-card { background: white; border-radius: 24px; padding: 44px 46px; max-width: 420px; width: 100%; box-shadow: 0 30px 80px rgba(0,0,0,0.35); animation: loginIn 0.35s ease-out; }
+  @keyframes loginIn { from { opacity: 0; transform: translateY(20px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .login-logo { text-align: center; font-size: 42px; margin-bottom: 12px; }
+  .login-card h2 { font-size: 22px; font-weight: 800; color: var(--primary-dark); text-align: center; margin-bottom: 6px; }
+  .login-card .login-sub { text-align: center; color: var(--text-muted); font-size: 13px; margin-bottom: 30px; }
+  .login-field { margin-bottom: 16px; }
+  .login-field label { display: block; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+  .login-field input { width: 100%; padding: 13px 16px; border: 1.5px solid #cfddee; border-radius: 12px; font-size: 15px; background: #fafdff; outline: none; transition: 0.2s; font-family: inherit; }
+  .login-field input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(30,95,122,0.12); background: white; }
+  .login-btn { width: 100%; padding: 14px; border-radius: 30px; border: none; background: var(--primary); color: white; font-weight: 700; font-size: 16px; cursor: pointer; transition: 0.2s; margin-top: 10px; box-shadow: 0 6px 16px rgba(20,70,100,0.25); font-family: inherit; }
+  .login-btn:hover { background: var(--primary-dark); transform: translateY(-1px); }
+  .login-error { color: var(--danger); font-size: 13px; text-align: center; margin-top: 14px; min-height: 18px; font-weight: 600; }
+  .login-footer { text-align: center; font-size: 11.5px; color: #8ba6bb; margin-top: 22px; line-height: 1.6; }
+
+  /* 主界面 */
+  header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 6px 4px 16px; }
+  header h1 { font-size: 24px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 10px; }
+  header h1 .sub { font-size: 13px; font-weight: 500; color: var(--primary); background: var(--primary-light); padding: 3px 12px; border-radius: 30px; }
+  .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .sync-status { font-size: 13px; padding: 6px 14px; border-radius: 30px; background: #eef4fa; color: var(--text-muted); border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 6px; }
+  .sync-status.online { background: #e3f6ea; color: var(--success); border-color: #b3e0c4; }
+  .sync-status.syncing { background: #fff6e0; color: var(--warning); border-color: #f0d99b; }
+  .sync-status.error { background: #ffebeb; color: var(--danger); border-color: #f0c4c4; }
+  .sync-status .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block; }
+  .current-user-pill { display: flex; align-items: center; gap: 8px; background: white; border: 1px solid var(--border); padding: 6px 14px 6px 6px; border-radius: 30px; font-size: 13px; font-weight: 600; color: var(--primary-dark); }
+  .current-user-pill .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; }
+  .current-user-pill.admin .avatar { background: linear-gradient(135deg, #d97706, #f59e0b); }
+  .current-user-pill.super .avatar { background: linear-gradient(135deg, #7c2d12, #dc2626); }
+  .icon-btn { background: white; border: 1px solid var(--border); width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: 0.15s; }
+  .icon-btn:hover { background: var(--primary-light); border-color: var(--primary); }
+  .icon-btn.logout:hover { background: #fff0f0; border-color: #f0c4c4; color: var(--danger); }
+  .permission-hint { background: #e8f4ff; border-left: 4px solid var(--primary); padding: 9px 18px; border-radius: 10px; color: #1a4b6e; font-size: 13px; margin-bottom: 16px; display: block; line-height: 1.5; }
+  .permission-hint.super { background: #fff5e6; border-left-color: #d97706; color: #7a4a0e; }
+
+  .main-grid { display: grid; grid-template-columns: 470px 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 1080px) { .main-grid { grid-template-columns: 1fr; } }
+
+  .card { background: white; border-radius: 18px; border: 1px solid var(--border); padding: 20px 22px; box-shadow: 0 3px 10px rgba(20,60,90,0.04); margin-bottom: 18px; }
+  .card:last-child { margin-bottom: 0; }
+  .card h2 { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px dashed #d5e3ee; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .card h2 small { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px 12px; }
+  .form-field { display: flex; flex-direction: column; gap: 5px; }
+  .form-field.full { grid-column: 1 / -1; }
+  .form-field label { font-weight: 600; color: #1f4868; font-size: 13px; line-height: 1.3; }
+  .form-field label .req { color: #dc2626; }
+  .form-field input, .form-field select { padding: 10px 13px; border: 1px solid #cfddee; border-radius: 12px; font-size: 14px; background: #fafdff; transition: 0.2s; outline: none; font-family: inherit; width: 100%; height: 40px; line-height: 1.3; }
+  .form-field input[readonly] { background: #eef4fa; color: var(--primary-dark); font-weight: 700; cursor: not-allowed; }
+  .form-field input:disabled, .form-field select:disabled { background: #f0f4f8; color: #3a6c8c; cursor: not-allowed; font-weight: 700; }
+  .form-field input:focus, .form-field select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(30,95,122,0.12); background: white; }
+  .file-input-wrapper { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .file-input-wrapper input[type="file"] { font-size: 12px; padding: 7px; background: #fafdff; border: 1px dashed #aac4da; border-radius: 10px; width: 100%; cursor: pointer; height: auto; }
+  .file-list-preview { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .file-chip { display: inline-flex; align-items: center; gap: 4px; background: #e8f2fa; color: var(--primary); padding: 4px 10px; border-radius: 12px; font-size: 11.5px; font-weight: 600; border: 1px solid #c5dcf0; max-width: 100%; }
+  .file-chip .fname { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .section-block { margin-top: 18px; padding-top: 18px; border-top: 2px dashed #d5e3ee; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; flex-wrap: wrap; }
+  .section-header .title { font-size: 15px; font-weight: 700; color: var(--primary-dark); display: flex; align-items: center; gap: 8px; }
+  .section-header .count-badge { background: var(--primary); color: white; font-size: 11px; padding: 1px 8px; border-radius: 10px; font-weight: 800; }
+  .section-header .count-badge.payments { background: var(--paid); }
+  .add-row-btn { padding: 8px 16px; border: 1.5px dashed var(--primary); background: var(--primary-light); color: var(--primary); border-radius: 20px; cursor: pointer; font-weight: 700; font-size: 12.5px; transition: 0.15s; font-family: inherit; display: inline-flex; align-items: center; gap: 4px; }
+  .add-row-btn:hover { background: var(--primary); color: white; border-style: solid; }
+  .add-row-btn.payments { border-color: var(--paid); background: #e8f7ec; color: var(--paid); }
+  .add-row-btn.payments:hover { background: var(--paid); color: white; }
+
+  .model-row { background: #fafdff; border: 1px solid #dce9f4; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; transition: 0.15s; animation: rowIn 0.2s ease-out; }
+  @keyframes rowIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  .model-row:hover { border-color: #b8d4e8; box-shadow: 0 2px 8px rgba(30,95,122,0.06); }
+  .model-row-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: var(--primary); }
+  .model-row-header .remove-row-btn { background: white; border: 1px solid #f0c4c4; color: var(--danger); width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; transition: 0.15s; font-family: inherit; padding: 0; }
+  .model-row-header .remove-row-btn:hover:not(:disabled) { background: #fff0f0; transform: scale(1.1); }
+  .model-row-header .remove-row-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .model-row-grid { display: grid; grid-template-columns: 1.5fr 0.7fr 1fr 1fr 1fr; gap: 8px; }
+  @media (max-width: 700px) { .model-row-grid { grid-template-columns: 1fr 1fr; } }
+  .model-row-grid .form-field { gap: 3px; margin: 0; }
+  .model-row-grid .form-field label { font-size: 11px; color: #3a6c8c; font-weight: 600; }
+  .model-row-grid .form-field input { padding: 7px 9px; height: 34px; font-size: 13px; border-radius: 10px; }
+
+  .payment-row { background: #fafefa; border: 1px solid #d5ebdb; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; transition: 0.15s; animation: rowIn 0.2s ease-out; }
+  .payment-row:hover { border-color: #a9d9b8; box-shadow: 0 2px 8px rgba(46,139,87,0.08); }
+  .payment-row-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: var(--paid); }
+  .payment-row-header .remove-row-btn { background: white; border: 1px solid #f0c4c4; color: var(--danger); width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; transition: 0.15s; font-family: inherit; padding: 0; }
+  .payment-row-header .remove-row-btn:hover { background: #fff0f0; transform: scale(1.1); }
+  .payment-row-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .payment-row-grid .form-field { gap: 3px; margin: 0; }
+  .payment-row-grid .form-field label { font-size: 11px; color: #2e7a4c; font-weight: 600; }
+  .payment-row-grid .form-field input { padding: 7px 9px; height: 34px; font-size: 13px; border-radius: 10px; }
+
+  .order-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; padding: 12px 14px; background: linear-gradient(90deg, #eef6fd 0%, #f6faff 100%); border-radius: 12px; }
+  .order-summary .summary-item { display: flex; flex-direction: column; gap: 2px; align-items: center; text-align: center; }
+  .order-summary .summary-item .label { font-size: 11px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.3px; }
+  .order-summary .summary-item .value { font-size: 17px; font-weight: 800; color: var(--primary-dark); font-variant-numeric: tabular-nums; }
+  .order-summary .summary-item.received .value { color: var(--paid); }
+  .order-summary .summary-item.outstanding .value { color: var(--warning); }
+  .order-summary .summary-item.outstanding.zero .value { color: var(--success); }
+
+  .btn-primary { width: 100%; padding: 14px 24px; border-radius: 30px; border: none; background: var(--primary); color: white; font-weight: 700; font-size: 15px; cursor: pointer; transition: 0.2s; margin-top: 16px; box-shadow: 0 5px 14px rgba(20,70,100,0.2); font-family: inherit; }
+  .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+  .btn-primary:disabled { background: #a0b8c8; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .stat-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
+  @media (max-width: 900px) { .stat-cards { grid-template-columns: repeat(2, 1fr); } }
+  .stat-card { background: linear-gradient(135deg, #f3f9ff 0%, #e8f2fa 100%); border: 1px solid #d2e4f2; border-radius: 14px; padding: 13px 8px; text-align: center; }
+  .stat-card .label { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; letter-spacing: 0.3px; }
+  .stat-card .value { font-size: 19px; font-weight: 800; color: var(--primary-dark); line-height: 1.2; word-break: break-all; font-variant-numeric: tabular-nums; }
+  .stat-card .value.small { font-size: 15px; }
+  .stat-card.received { background: linear-gradient(135deg, #effaf3 0%, #e3f6ea 100%); border-color: #b8dfc0; }
+  .stat-card.received .value { color: var(--paid); }
+  .stat-card.outstanding { background: linear-gradient(135deg, #fff8ee 0%, #fff3e0 100%); border-color: #f0d99b; }
+  .stat-card.outstanding .value { color: var(--warning); }
+  .stat-card.outstanding.zero { background: linear-gradient(135deg, #effaf3 0%, #e3f6ea 100%); border-color: #b8dfc0; }
+  .stat-card.outstanding.zero .value { color: var(--success); }
+
+  /* 时间统计 */
+  .time-tabs { display: flex; gap: 4px; margin-bottom: 14px; background: #f0f6fd; padding: 5px; border-radius: 22px; width: fit-content; flex-wrap: wrap; }
+  .time-tab { padding: 7px 20px; border-radius: 18px; border: none; background: transparent; color: var(--primary); font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.15s; font-family: inherit; }
+  .time-tab:hover { background: white; }
+  .time-tab.active { background: var(--primary); color: white; box-shadow: 0 2px 8px rgba(30,95,122,0.25); }
+  .time-stats-wrap { max-height: 460px; overflow-y: auto; border-radius: 10px; }
+  .time-stats-wrap .report-table thead th { position: sticky; top: 0; z-index: 2; }
+  .time-stats-wrap .report-table thead th:first-child { border-radius: 10px 0 0 0; }
+  .time-stats-wrap .report-table thead th:last-child { border-radius: 0 10px 0 0; }
+
+  .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px dashed #e3edf5; }
+  .toolbar .spacer { flex: 1; }
+  .tool-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 15px; border-radius: 20px; border: 1px solid var(--border); background: white; color: var(--primary); font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.15s; font-family: inherit; white-space: nowrap; }
+  .tool-btn:hover { background: var(--primary-light); border-color: var(--primary); }
+  .tool-btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
+  .tool-btn.primary:hover { background: var(--primary-dark); }
+
+  .dropdown { position: relative; display: inline-block; }
+  .dropdown-menu { position: absolute; top: calc(100% + 6px); right: 0; background: white; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(20,60,90,0.15); min-width: 220px; padding: 6px; z-index: 100; display: none; overflow: hidden; }
+  .dropdown-menu.show { display: block; animation: dropIn 0.15s ease-out; }
+  @keyframes dropIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+  .dropdown-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--text); transition: 0.1s; }
+  .dropdown-item:hover { background: var(--primary-light); color: var(--primary-dark); }
+  .dropdown-divider { height: 1px; background: #eef4f9; margin: 4px 0; }
+
+  .order-group { border: 1px solid #dce9f4; border-radius: 12px; margin-bottom: 12px; overflow: hidden; transition: box-shadow 0.15s; }
+  .order-group:hover { box-shadow: 0 4px 12px rgba(30,95,122,0.08); }
+  .order-group-header { background: linear-gradient(90deg, #eef6fd 0%, #f6faff 100%); padding: 11px 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid #dce9f4; cursor: pointer; user-select: none; }
+  .order-group-header:hover { background: linear-gradient(90deg, #e4f0fb 0%, #eef6fd 100%); }
+  .order-group-header .left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .order-group-header .order-no { font-family: 'SF Mono', 'Consolas', monospace; font-size: 15px; font-weight: 800; color: var(--primary-dark); background: white; padding: 3px 12px; border-radius: 8px; border: 1.5px solid #b8d4e8; letter-spacing: 0.5px; }
+  .order-group-header .meta { font-size: 12.5px; color: var(--text-muted); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .order-group-header .meta b { color: var(--primary-dark); }
+  .order-group-header .right { display: flex; align-items: center; gap: 8px; font-size: 13px; flex-wrap: wrap; }
+  .order-group-header .right .total-badge { background: var(--primary); color: white; padding: 4px 14px; border-radius: 20px; font-weight: 700; font-size: 13px; }
+  .order-group-header .right .received-badge { background: var(--paid); color: white; padding: 4px 14px; border-radius: 20px; font-weight: 700; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+  .order-group-header .right .received-badge.partial { background: var(--warning); }
+  .order-group-header .right .count-badge { background: #e8f2fa; color: var(--primary); padding: 4px 12px; border-radius: 20px; font-weight: 700; font-size: 12px; }
+  .group-btn { background: white; border: 1px solid #b8d4e8; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; color: var(--primary); cursor: pointer; transition: 0.15s; font-family: inherit; display: inline-flex; align-items: center; gap: 4px; }
+  .group-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
+  .group-btn.edit { border-color: #d97706; color: #d97706; }
+  .group-btn.edit:hover { background: #d97706; color: white; }
+  .toggle-arrow { font-size: 11px; color: var(--text-muted); transition: transform 0.2s; display: inline-block; }
+  .order-group.collapsed .toggle-arrow { transform: rotate(-90deg); }
+  .order-group-body { padding: 0; }
+  .order-group.collapsed .order-group-body { display: none; }
+
+  .table-wrapper { overflow-x: auto; border-radius: 10px; border: 1px solid #e3edf5; }
+  .order-table { width: 100%; border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }
+  .order-table thead { background: #f1f7fc; }
+  .order-table th { padding: 10px 9px; text-align: left; font-weight: 700; color: var(--primary-dark); font-size: 12px; border-bottom: 2px solid #d5e3ee; }
+  .order-table th.num, .order-table td.num { text-align: right; }
+  .order-table td { padding: 9px 9px; border-bottom: 1px solid #eef4f9; vertical-align: middle; }
+  .order-table tbody tr:hover { background: #f7fbff; }
+  .order-table .total-cell { font-weight: 700; color: var(--primary-dark); }
+  .payment-badge { display: inline-block; padding: 3px 9px; border-radius: 12px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .payment-未收款 { background: #ffebeb; color: #c0392b; }
+  .payment-部分收款 { background: #fff3e0; color: #b06c00; }
+  .payment-已收款 { background: #e3f6ea; color: #1e7a4c; }
+  .file-badge { display: inline-flex; align-items: center; gap: 3px; background: #e8f2fa; color: var(--accent); padding: 4px 9px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid #c5dcf0; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: 0.15s; }
+  .file-badge:hover { background: #d3e8f8; border-color: var(--accent); }
+  .file-badge.multi { background: linear-gradient(135deg, #e8f2fa 0%, #d7ebf8 100%); border-color: #88b8d4; font-weight: 700; }
+
+  .payment-detail-section { padding: 10px 16px; background: #fafffb; border-top: 1px solid #d5ebdb; }
+  .payment-detail-section .pd-title { font-size: 12.5px; font-weight: 700; color: var(--paid); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .payment-detail-table { width: 100%; border-collapse: collapse; font-size: 12.5px; background: white; border-radius: 8px; overflow: hidden; }
+  .payment-detail-table th { background: #e8f7ec; color: #1a5c35; padding: 6px 10px; text-align: left; font-weight: 700; font-size: 11.5px; border-bottom: 1px solid #d5ebdb; }
+  .payment-detail-table th.num { text-align: right; }
+  .payment-detail-table td { padding: 6px 10px; border-bottom: 1px solid #eef7f1; }
+  .payment-detail-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .payment-detail-table tr:last-child td { border-bottom: none; }
+
+  .no-data { text-align: center; padding: 36px 10px; color: #a3bacb; font-size: 14px; }
+  .no-data .big { font-size: 34px; display: block; margin-bottom: 8px; }
+
+  .filter-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; background: #f7fafd; padding: 13px; border-radius: 14px; border: 1px solid #e3edf5; }
+  .filter-item { display: flex; flex-direction: column; gap: 4px; }
+  .filter-item label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  .filter-item input, .filter-item select { padding: 8px 10px; border: 1px solid #cfddee; border-radius: 10px; font-size: 13px; background: white; outline: none; font-family: inherit; height: 36px; }
+  .filter-item input:focus, .filter-item select:focus { border-color: var(--primary); }
+  .filter-actions { display: flex; align-items: flex-end; gap: 8px; }
+  .btn-sm { padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border); background: white; color: var(--primary); font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.15s; font-family: inherit; white-space: nowrap; height: 36px; }
+  .btn-sm:hover { background: var(--primary-light); border-color: var(--primary); }
+  .btn-sm.danger { color: var(--danger); border-color: #f0c4c4; }
+  .btn-sm.danger:hover { background: #fff0f0; border-color: var(--danger); }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(10,30,50,0.5); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: white; border-radius: 20px; padding: 26px 28px; max-width: 640px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 60px rgba(0,0,0,0.25); }
+  .modal.wide { max-width: 960px; }
+  .modal h3 { font-size: 20px; color: var(--text); margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; }
+  .modal .modal-sub { color: var(--text-muted); font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
+  .modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-muted); padding: 0 4px; transition: 0.15s; }
+  .modal-close:hover { color: var(--danger); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+  .modal-actions button { padding: 11px 22px; border-radius: 30px; font-weight: 700; font-size: 14px; cursor: pointer; border: none; font-family: inherit; transition: 0.15s; flex: 1; min-width: 120px; }
+  .btn-confirm { background: var(--primary); color: white; }
+  .btn-confirm:hover { background: var(--primary-dark); }
+  .btn-cancel { background: #eef4fa; color: var(--text-muted); }
+  .btn-cancel:hover { background: #dfeaf3; }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-danger:hover { background: #b91c1c; }
+
+  .info-box { background: #f0f7ff; border-left: 3px solid var(--primary); padding: 10px 14px; border-radius: 8px; font-size: 12.5px; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px; }
+  .info-box.warn { background: #fff8e6; border-left-color: #e6a017; color: #7a5c0e; }
+  .settings-field { margin-bottom: 14px; }
+  .settings-field label { font-size: 13px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 5px; }
+  .settings-field input { width: 100%; padding: 10px 13px; border: 1px solid var(--border); border-radius: 12px; font-size: 14px; background: #fafdff; outline: none; font-family: inherit; }
+  .share-url { background: #eef7ee; border: 1px solid #b8dfc0; padding: 10px 14px; border-radius: 10px; font-family: monospace; font-size: 12px; word-break: break-all; color: #1e7a4c; margin: 10px 0; user-select: all; white-space: pre-wrap; }
+
+  .report-section { margin-bottom: 22px; }
+  .report-section h4 { font-size: 15px; color: var(--primary-dark); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1.5px solid #e3edf5; display: flex; align-items: center; gap: 8px; }
+  .report-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .report-table th { background: var(--primary-light); color: var(--primary-dark); padding: 9px 12px; text-align: left; font-weight: 700; font-size: 12px; border-bottom: 2px solid #c9dded; white-space: nowrap; }
+  .report-table th:first-child { border-radius: 10px 0 0 0; }
+  .report-table th:last-child { border-radius: 0 10px 0 0; }
+  .report-table th.num, .report-table td.num { text-align: right; }
+  .report-table td { padding: 9px 12px; border-bottom: 1px solid #eef4f9; }
+  .report-table tr:hover td { background: #f7fbff; }
+  .report-table tbody tr:last-child td { border-bottom: none; }
+  .report-table tfoot td { background: #f3f9ff; font-weight: 800; color: var(--primary-dark); border-top: 2px solid #c9dded; padding: 10px 12px; }
+  .report-empty { text-align: center; padding: 24px; color: #a3bacb; font-size: 13px; }
+
+  .adv-search-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .adv-search-grid .full { grid-column: 1 / -1; }
+  .adv-search-grid .form-field { gap: 4px; }
+  .adv-search-grid label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; }
+  .adv-search-grid input, .adv-search-grid select { padding: 10px 13px; border: 1px solid #cfddee; border-radius: 12px; font-size: 14px; background: #fafdff; outline: none; font-family: inherit; width: 100%; height: 40px; }
+  .adv-search-grid input:focus, .adv-search-grid select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(30,95,122,0.1); }
+  .quick-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .quick-chip { padding: 6px 14px; border-radius: 20px; background: #f0f6fd; border: 1px solid #d2e4f2; font-size: 12.5px; font-weight: 600; color: var(--primary); cursor: pointer; transition: 0.15s; }
+  .quick-chip:hover, .quick-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+  .user-manage-section { border: 1px solid #dce9f4; border-radius: 14px; padding: 16px 18px; margin-bottom: 18px; background: #fafdff; }
+  .user-manage-section h4 { font-size: 14px; font-weight: 700; color: var(--primary-dark); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+  .user-manage-section .btn-add-user { background: var(--primary); color: white; border: none; padding: 10px 22px; border-radius: 20px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: inherit; transition: 0.15s; margin-top: 6px; }
+  .user-manage-section .btn-add-user:hover { background: var(--primary-dark); }
+  .role-tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+  .role-tag.super { background: #ffe0e0; color: #b91c1c; }
+  .role-tag.admin { background: #fff3e0; color: #b06c00; }
+  .role-tag.editor { background: #e3f6ea; color: #1e7a4c; }
+  .scope-tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: #e8f2fa; color: var(--primary-dark); }
+  .user-list-row td { padding: 10px 12px !important; }
+  .user-list-row .actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .user-list-row .actions button { padding: 5px 12px; border-radius: 14px; font-size: 11.5px; font-weight: 600; cursor: pointer; font-family: inherit; border: 1px solid var(--border); background: white; color: var(--primary); transition: 0.15s; }
+  .user-list-row .actions button:hover { background: var(--primary-light); }
+  .user-list-row .actions button.danger { color: var(--danger); border-color: #f0c4c4; }
+  .user-list-row .actions button.danger:hover { background: #fff0f0; }
+  .user-list-row .actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--primary-dark); color: white; padding: 12px 26px; border-radius: 40px; font-weight: 600; font-size: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); z-index: 2000; opacity: 0; transition: 0.3s; pointer-events: none; max-width: 90vw; text-align: center; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { background: #9b2c2c; }
+  .toast.success { background: #1e7a4c; }
+
+  .hidden { display: none !important; }
+
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #c5d8e8; border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: #a8c4db; }
+
+  @media print { body * { visibility: hidden; } #printArea, #printArea * { visibility: visible; } #printArea { position: absolute; left: 0; top: 0; width: 100%; } }
+</style>
+</head>
+<body>
+
+<!-- 登录 -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">📦</div>
+    <h2>客户订单统计系统</h2>
+    <p class="login-sub">请输入您的账号信息进行登录</p>
+    <div class="login-field">
+      <label>用户名</label>
+      <input type="text" id="loginUsername" placeholder="请输入用户名" autocomplete="username" autofocus>
+    </div>
+    <div class="login-field">
+      <label>密码</label>
+      <input type="password" id="loginPassword" placeholder="请输入密码" autocomplete="current-password">
+    </div>
+    <button class="login-btn" id="loginBtn">🔓 登 录</button>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-footer">仅限授权用户使用，请勿分享账号密码</div>
+  </div>
+</div>
+
+<!-- 主界面 -->
+<div class="app" id="mainApp" style="display:none;">
+  <header>
+    <h1>📦 客户订单统计系统 <span class="sub">多车型 · 多水单 · 时间统计</span></h1>
+    <div class="header-actions">
+      <div class="current-user-pill" id="currentUserPill">
+        <span class="avatar" id="userAvatar">肆</span>
+        <span id="userDisplayName">肆玖</span>
+      </div>
+      <span class="sync-status" id="syncStatus"><span class="dot"></span> 本地模式</span>
+      <button class="icon-btn" id="manageUsersBtn" title="角色与账号管理" style="display:none;">👥</button>
+      <button class="icon-btn" id="settingsBtn" title="共享设置">⚙️</button>
+      <button class="icon-btn logout" id="logoutBtn" title="退出登录">🚪</button>
+    </div>
+  </header>
+
+  <div id="permissionHint" class="permission-hint">正在加载...</div>
+
+  <div class="main-grid">
+    <div>
+      <div class="card" id="formCard">
+        <h2>📝 录入订单 <small id="formEditHint">一个编号可添加多个车型</small></h2>
+        <form id="orderForm" autocomplete="off">
+          <div class="form-grid">
+            <div class="form-field full">
+              <label>订单编号 <span class="req">*</span></label>
+              <input type="text" id="orderNo" placeholder="如：ORD-2025-001（同编号可含多个车型）" required maxlength="30">
+            </div>
+            <div class="form-field full">
+              <label>业务员名称 <span class="req">*</span></label>
+              <select id="salesperson" required></select>
+            </div>
+            <div class="form-field full">
+              <label>订单时间 <span class="req">*</span></label>
+              <input type="date" id="orderDate" required>
+            </div>
+            <div class="form-field full">
+              <label>客户名称 <span class="req">*</span></label>
+              <input type="text" id="customerName" placeholder="例如：ABC贸易" required maxlength="40">
+            </div>
+            <div class="form-field full">
+              <label>客户水单（可多选图片 / 文件）</label>
+              <div class="file-input-wrapper">
+                <input type="file" id="receiptFile" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" multiple>
+                <div class="file-list-preview" id="fileNameDisplay"></div>
+              </div>
+            </div>
+          </div>
+          <div class="section-block">
+            <div class="section-header">
+              <div class="title">🚗 车型明细 <span class="count-badge" id="modelCountBadge">1</span></div>
+              <button type="button" class="add-row-btn" id="addModelBtn">➕ 添加车型</button>
+            </div>
+            <div id="modelRowsContainer"></div>
+          </div>
+          <div class="section-block">
+            <div class="section-header">
+              <div class="title">💰 收款明细 <span class="count-badge payments" id="paymentCountBadge">0</span></div>
+              <button type="button" class="add-row-btn payments" id="addPaymentBtn">➕ 添加收款</button>
+            </div>
+            <div id="paymentRowsContainer"></div>
+            <div style="text-align:center; padding:6px 0; color:var(--text-muted); font-size:12px;" id="paymentHint">尚未录入收款记录</div>
+          </div>
+          <div class="order-summary">
+            <div class="summary-item">
+              <div class="label">订单总金额</div>
+              <div class="value" id="summaryOrderTotal">$0.00</div>
+            </div>
+            <div class="summary-item received">
+              <div class="label">已收款总额</div>
+              <div class="value" id="summaryReceived">$0.00</div>
+            </div>
+            <div class="summary-item outstanding zero" id="summaryOutstandingWrap">
+              <div class="label">未收款金额</div>
+              <div class="value" id="summaryOutstanding">$0.00</div>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary" id="submitBtn">➕ 提交订单</button>
+        </form>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>📊 统计概览 <small id="scopeHint">当前可见范围</small></h2>
+        <div class="stat-cards">
+          <div class="stat-card"><div class="label">订单编号数</div><div class="value" id="statTotalOrders">0</div></div>
+          <div class="stat-card"><div class="label">车型记录数</div><div class="value" id="statTotalRecords">0</div></div>
+          <div class="stat-card"><div class="label">订单总金额</div><div class="value small" id="statTotalAmount">0.00</div></div>
+          <div class="stat-card received"><div class="label">已收款总额</div><div class="value small" id="statTotalReceived">0.00</div></div>
+          <div class="stat-card outstanding" id="statOutstandingCard"><div class="label">未收款金额</div><div class="value small" id="statTotalOutstanding">0.00</div></div>
+        </div>
+      </div>
+
+      <!-- 新增：按时间统计（仅管理员可见） -->
+      <div class="card" id="timeStatsCard" style="display:none;">
+        <h2>📅 按时间统计 <small id="timeStatsScopeHint">当前可见范围</small></h2>
+        <div class="time-tabs" id="timeTabs">
+          <button type="button" class="time-tab active" data-period="day">📆 按日</button>
+          <button type="button" class="time-tab" data-period="month">🗓️ 按月</button>
+          <button type="button" class="time-tab" data-period="quarter">📊 按季度</button>
+          <button type="button" class="time-tab" data-period="year">📅 按年</button>
+        </div>
+        <div class="time-stats-wrap">
+          <table class="report-table">
+            <thead id="timeStatsHead"></thead>
+            <tbody id="timeStatsBody"></tbody>
+          </table>
+          <div id="timeStatsNoData" class="report-empty">暂无数据</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>👥 按业务员统计 <small id="spScopeHint">当前可见范围</small></h2>
+        <div id="salespersonStatsWrap">
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th>业务员</th>
+                <th class="num">订单数</th>
+                <th class="num">总金额</th>
+                <th class="num">已收款</th>
+                <th class="num">未收款</th>
+              </tr>
+            </thead>
+            <tbody id="salespersonStatsBody"></tbody>
+          </table>
+          <div id="salespersonNoData" class="report-empty">暂无数据</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📋 订单列表 <small id="orderCountHint"></small></h2>
+        <div class="toolbar">
+          <button class="tool-btn primary" id="btnExport">📥 导出数据</button>
+          <div class="dropdown" id="exportDropdown">
+            <button class="tool-btn" id="btnExportMenu">▾ 导出选项</button>
+            <div class="dropdown-menu" id="exportMenu">
+              <div class="dropdown-item" data-export="csv-filtered">📄 导出当前筛选结果（CSV）</div>
+              <div class="dropdown-item" data-export="excel-filtered">📊 导出当前筛选结果（Excel）</div>
+              <div class="dropdown-divider"></div>
+              <div class="dropdown-item" data-export="csv-all">📄 导出全部可见数据（CSV）</div>
+              <div class="dropdown-item" data-export="excel-all">📊 导出全部可见数据（Excel）</div>
+              <div class="dropdown-divider"></div>
+              <div class="dropdown-item" data-export="stats-report">📈 导出统计报表（Excel）</div>
+              <div class="dropdown-item" data-export="time-report" id="exportTimeReportItem" style="display:none;">📅 导出时间统计报表（Excel）</div>
+            </div>
+          </div>
+          <button class="tool-btn" id="btnStatsReport">📊 统计报表</button>
+          <button class="tool-btn" id="btnAdvSearch">🔍 高级查询</button>
+          <button class="tool-btn" id="btnPrint">🖨️ 打印</button>
+          <div class="spacer"></div>
+        </div>
+        <div class="filter-bar">
+          <div class="filter-item"><label>起始日期</label><input type="date" id="filterStartDate"></div>
+          <div class="filter-item"><label>结束日期</label><input type="date" id="filterEndDate"></div>
+          <div class="filter-item" id="salespersonFilterWrap"><label>业务员</label><select id="filterSalesperson"><option value="">全部业务员</option></select></div>
+          <div class="filter-item"><label>客户名称</label><input type="text" id="filterCustomer" placeholder="搜索客户"></div>
+          <div class="filter-item"><label>车型</label><input type="text" id="filterModel" placeholder="搜索车型"></div>
+          <div class="filter-item"><label>订单编号</label><input type="text" id="filterOrderNo" placeholder="搜索编号"></div>
+          <div class="filter-actions"><button class="btn-sm" id="resetFilterBtn">↺ 重置</button></div>
+        </div>
+        <div id="orderGroupsContainer"></div>
+        <div id="ordersNoData" class="no-data hidden"><span class="big">📭</span>暂无符合条件的订单</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑订单模态框 -->
+<div class="modal-overlay" id="editOrderModal">
+  <div class="modal wide">
+    <h3>✏️ 编辑订单 <button class="modal-close" data-close="editOrderModal">✕</button></h3>
+    <p class="modal-sub">修改订单信息、车型明细和收款明细</p>
+    <div class="form-grid">
+      <div class="form-field"><label>订单编号</label><input type="text" id="editOrderNo" readonly></div>
+      <div class="form-field"><label>业务员</label><input type="text" id="editSalesperson" readonly></div>
+      <div class="form-field"><label>订单时间</label><input type="date" id="editOrderDate"></div>
+      <div class="form-field"><label>客户名称</label><input type="text" id="editCustomerName" maxlength="40"></div>
+      <div class="form-field full">
+        <label>客户水单（可多选；留空则保留原文件）</label>
+        <div class="file-input-wrapper">
+          <input type="file" id="editReceiptFile" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" multiple>
+          <div class="file-list-preview" id="editFileNameDisplay"></div>
+        </div>
+      </div>
+    </div>
+    <div class="section-block">
+      <div class="section-header">
+        <div class="title">🚗 车型明细 <span class="count-badge" id="editModelCountBadge">1</span></div>
+        <button type="button" class="add-row-btn" id="editAddModelBtn">➕ 添加车型</button>
+      </div>
+      <div id="editModelRowsContainer"></div>
+    </div>
+    <div class="section-block">
+      <div class="section-header">
+        <div class="title">💰 收款明细 <span class="count-badge payments" id="editPaymentCountBadge">0</span></div>
+        <button type="button" class="add-row-btn payments" id="editAddPaymentBtn">➕ 添加收款</button>
+      </div>
+      <div id="editPaymentRowsContainer"></div>
+    </div>
+    <div class="order-summary">
+      <div class="summary-item"><div class="label">订单总金额</div><div class="value" id="editSummaryOrderTotal">$0.00</div></div>
+      <div class="summary-item received"><div class="label">已收款总额</div><div class="value" id="editSummaryReceived">$0.00</div></div>
+      <div class="summary-item outstanding zero" id="editSummaryOutstandingWrap"><div class="label">未收款金额</div><div class="value" id="editSummaryOutstanding">$0.00</div></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-confirm" id="saveEditOrderBtn">💾 保存修改</button>
+      <button class="btn-cancel" data-close="editOrderModal">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 用户管理 -->
+<div class="modal-overlay" id="userManageModal">
+  <div class="modal wide">
+    <h3>👥 角色与账号管理 <button class="modal-close" data-close="userManageModal">✕</button></h3>
+    <p class="modal-sub">新增管理员或业务员账号。管理员默认不可查看 cookie 的订单，业务员只能查看自己名下的订单。</p>
+    <div class="user-manage-section">
+      <h4>➕ 新增账号</h4>
+      <div class="adv-search-grid">
+        <div class="form-field"><label>角色 <span style="color:#dc2626;">*</span></label>
+          <select id="newUserRole">
+            <option value="editor">✏️ 业务员（仅自己订单）</option>
+            <option value="admin">👑 管理员（除 cookie 外所有订单）</option>
+          </select>
+        </div>
+        <div class="form-field"><label>登录用户名 <span style="color:#dc2626;">*</span></label><input type="text" id="newUserName" placeholder="如 zhangsan" maxlength="30"></div>
+        <div class="form-field"><label>业务员名称 <span style="color:#dc2626;">*</span></label><input type="text" id="newSalesperson" placeholder="如 张三" maxlength="20"></div>
+        <div class="form-field"><label>密码 <span style="color:#dc2626;">*</span></label><input type="password" id="newPassword" placeholder="至少6位" maxlength="40"></div>
+        <div class="form-field full"><label>确认密码 <span style="color:#dc2626;">*</span></label><input type="password" id="newPasswordConfirm" placeholder="再次输入密码" maxlength="40"></div>
+      </div>
+      <div class="info-box warn" style="margin-bottom:10px;">
+        <strong>权限说明：</strong><br>
+        · <strong>超级管理员</strong>（肆玖-yao、alfred-wei）：可查看/统计<strong>所有业务员</strong>（含 cookie）的订单<br>
+        · <strong>新增管理员</strong>：可查看所有订单，但<strong>不可查看 cookie 的订单</strong><br>
+        · <strong>业务员</strong>：只能查看、编辑自己名下的订单
+      </div>
+      <button class="btn-add-user" id="addUserBtn">➕ 新增账号</button>
+    </div>
+    <h4 style="font-size:14px;font-weight:700;color:var(--primary-dark);margin-bottom:10px;">📋 现有账号</h4>
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th>业务员名称</th><th>登录用户名</th><th>角色</th><th>可见范围</th>
+          <th style="text-align:right;">操作</th>
+        </tr>
+      </thead>
+      <tbody id="userListBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 统计报表 -->
+<div class="modal-overlay" id="statsReportModal">
+  <div class="modal wide">
+    <h3>📊 统计报表 <button class="modal-close" data-close="statsReportModal">✕</button></h3>
+    <p class="modal-sub" id="reportScopeInfo">基于当前筛选范围生成多维度统计</p>
+    <div class="quick-chips" id="reportQuickChips">
+      <span class="quick-chip active" data-report="all">全部</span>
+      <span class="quick-chip" data-report="salesperson">按业务员</span>
+      <span class="quick-chip" data-report="customer">按客户</span>
+      <span class="quick-chip" data-report="model">按车型</span>
+      <span class="quick-chip" data-report="payment">按收款情况</span>
+      <span class="quick-chip" data-report="month">按月份</span>
+    </div>
+    <div id="reportContent"></div>
+    <div class="modal-actions">
+      <button class="btn-confirm" id="exportReportBtn">📥 导出报表（Excel）</button>
+      <button class="btn-cancel" data-close="statsReportModal">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 高级查询 -->
+<div class="modal-overlay" id="advSearchModal">
+  <div class="modal">
+    <h3>🔍 高级查询 <button class="modal-close" data-close="advSearchModal">✕</button></h3>
+    <p class="modal-sub">支持多条件组合查询，条件可叠加使用</p>
+    <div class="adv-search-grid">
+      <div class="form-field"><label>订单编号</label><input type="text" id="advOrderNo" placeholder="支持模糊匹配"></div>
+      <div class="form-field"><label>业务员</label><select id="advSalesperson"><option value="">全部</option></select></div>
+      <div class="form-field"><label>客户名称</label><input type="text" id="advCustomer" placeholder="模糊匹配"></div>
+      <div class="form-field"><label>车型</label><input type="text" id="advModel" placeholder="模糊匹配"></div>
+      <div class="form-field"><label>颜色</label><input type="text" id="advColor" placeholder="模糊匹配"></div>
+      <div class="form-field"><label>收款情况</label>
+        <select id="advPayment">
+          <option value="">全部</option>
+          <option value="未收款">未收款</option>
+          <option value="部分收款">部分收款</option>
+          <option value="已收款">已收款</option>
+        </select>
+      </div>
+      <div class="form-field"><label>订单日期 从</label><input type="date" id="advDateFrom"></div>
+      <div class="form-field"><label>订单日期 至</label><input type="date" id="advDateTo"></div>
+      <div class="form-field"><label>FOB价格 ≥</label><input type="number" id="advFobMin" min="0" step="0.01" placeholder="0"></div>
+      <div class="form-field"><label>FOB价格 ≤</label><input type="number" id="advFobMax" min="0" step="0.01" placeholder="不限"></div>
+      <div class="form-field"><label>总价 ≥</label><input type="number" id="advTotalMin" min="0" step="0.01" placeholder="0"></div>
+      <div class="form-field"><label>总价 ≤</label><input type="number" id="advTotalMax" min="0" step="0.01" placeholder="不限"></div>
+      <div class="form-field full"><label>数量 ≥</label><input type="number" id="advQtyMin" min="1" step="1" placeholder="不限"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-confirm" id="runAdvSearchBtn">🔍 执行查询</button>
+      <button class="btn-cancel" id="resetAdvSearchBtn">重置条件</button>
+      <button class="btn-cancel" data-close="advSearchModal">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- JSONBin 设置 -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h3>🔗 JSONBin 共享设置 <button class="modal-close" data-close="settingsModal">✕</button></h3>
+    <p class="modal-sub">使用 JSONBin.io 免费存储实现多人在线实时共享。</p>
+    <div class="info-box">
+      <strong>📌 使用步骤：</strong><br>
+      1. 访问 <a href="https://jsonbin.io" target="_blank" style="color:var(--primary);">jsonbin.io</a> 注册账号<br>
+      2. Dashboard → API Keys 获取 Master Key<br>
+      3. 粘贴 Master Key 后点击连接<br>
+      4. 将 Master Key 和 Bin ID 分享给同事
+    </div>
+    <div class="settings-field"><label>JSONBin Master Key</label><input type="password" id="jsonbinApiKey" placeholder="粘贴 JSONBin Master Key"></div>
+    <div class="settings-field"><label>Bin ID（数据仓ID）</label><input type="text" id="jsonbinBinId" placeholder="连接后自动生成" readonly></div>
+    <div class="settings-field"><label>同步状态</label><input type="text" id="jsonbinSyncInfo" placeholder="未连接" readonly></div>
+    <div class="modal-actions">
+      <button class="btn-confirm" id="connectJsonbinBtn">🔗 连接 JSONBin</button>
+      <button class="btn-cancel" data-close="settingsModal">关闭</button>
+    </div>
+    <div class="modal-actions" id="disconnectWrap" style="margin-top:10px; display:none;">
+      <button class="btn-danger" id="disconnectJsonbinBtn">断开连接，回到本地模式</button>
+    </div>
+    <div id="jsonbinShareWrap" class="hidden" style="margin-top:16px;">
+      <label style="font-size:13px;font-weight:600;color:var(--text-muted);">分享给同事的信息</label>
+      <div class="share-url" id="jsonbinShareInfo"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+        <button class="btn-sm" id="copyShareInfoBtn">📋 复制分享信息</button>
+        <button class="btn-sm" id="pullFromJsonbinBtn">📥 从 JSONBin 拉取最新数据</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="printArea" style="display:none;"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   客户订单统计系统 · 时间统计版
+   - 超级管理员（肆玖-yao、alfred-wei）：可查看/统计所有订单（含 cookie）
+   - 新增管理员：可查看订单但排除 cookie
+   - 业务员：仅自己订单
+   ============================================================ */
+(function() {
+  'use strict';
+
+  const SUPER_ADMINS = ['肆玖-yao', 'alfred-wei'];
+
+  function defaultUsers() {
+    return {
+      '肆玖-yao': { password: 'ywlqy660825', role: 'admin', salesperson: '肆玖', displayName: '肆玖', avatar: '肆', viewScope: { type: 'all', excluded: [] } },
+      'alfred-wei': { password: 'weixiang2025', role: 'admin', salesperson: 'Alfred', displayName: 'Alfred', avatar: 'A', viewScope: { type: 'all', excluded: [] } },
+      'cookie': { password: 'shaohua2026', role: 'editor', salesperson: 'cookie', displayName: 'cookie', avatar: 'C', viewScope: { type: 'self' } }
+    };
+  }
+
+  const LOGIN_KEY = 'order_app_login_v16';
+  const STORAGE_KEY = 'order_app_v16';
+  const JSONBIN_KEY = 'order_app_jsonbin_key_v16';
+  const JSONBIN_BIN = 'order_app_jsonbin_bin_v16';
+  const POLL_INTERVAL = 8000;
+  const MAX_FILE_SIZE = 500 * 1024;
+  const JSONBIN_API = 'https://api.jsonbin.io/v3';
+
+  let state = { orders: [], users: defaultUsers(), lastUpdated: 0, updatedBy: '' };
+  let currentUser = null;
+  let currentRole = 'admin';
+  let currentSalesperson = '';
+  let jsonbinApiKey = '';
+  let jsonbinBinId = '';
+  let pollTimer = null;
+  let pushTimer = null;
+  let isSyncing = false;
+  let collapsedGroups = {};
+  let currentReportType = 'all';
+  let timeStatsPeriod = 'day';
+  let modelRowCounter = 0;
+  let paymentRowCounter = 0;
+  let editModelRowCounter = 0;
+  let editPaymentRowCounter = 0;
+  let editContext = { originalOrderNo: null, originalSalesperson: null, originalReceipts: [] };
+
+  let bc = null;
+  try { bc = new BroadcastChannel('order_app_sync_v16'); } catch (e) { bc = null; }
+
+  const $ = id => document.getElementById(id);
+  const $$ = sel => document.querySelectorAll(sel);
+
+  const els = {
+    loginOverlay: $('loginOverlay'), loginUsername: $('loginUsername'), loginPassword: $('loginPassword'),
+    loginBtn: $('loginBtn'), loginError: $('loginError'),
+    mainApp: $('mainApp'), currentUserPill: $('currentUserPill'),
+    userAvatar: $('userAvatar'), userDisplayName: $('userDisplayName'),
+    logoutBtn: $('logoutBtn'), permissionHint: $('permissionHint'),
+    formCard: $('formCard'), formEditHint: $('formEditHint'),
+    syncStatus: $('syncStatus'), settingsBtn: $('settingsBtn'), manageUsersBtn: $('manageUsersBtn'),
+    orderNo: $('orderNo'), salesperson: $('salesperson'), orderDate: $('orderDate'), customerName: $('customerName'),
+    receiptFile: $('receiptFile'), fileNameDisplay: $('fileNameDisplay'),
+    orderForm: $('orderForm'), submitBtn: $('submitBtn'),
+    modelRowsContainer: $('modelRowsContainer'), addModelBtn: $('addModelBtn'), modelCountBadge: $('modelCountBadge'),
+    paymentRowsContainer: $('paymentRowsContainer'), addPaymentBtn: $('addPaymentBtn'),
+    paymentCountBadge: $('paymentCountBadge'), paymentHint: $('paymentHint'),
+    summaryOrderTotal: $('summaryOrderTotal'), summaryReceived: $('summaryReceived'),
+    summaryOutstanding: $('summaryOutstanding'), summaryOutstandingWrap: $('summaryOutstandingWrap'),
+    statTotalOrders: $('statTotalOrders'), statTotalRecords: $('statTotalRecords'),
+    statTotalAmount: $('statTotalAmount'), statTotalReceived: $('statTotalReceived'),
+    statTotalOutstanding: $('statTotalOutstanding'), statOutstandingCard: $('statOutstandingCard'),
+    // 新增：时间统计
+    timeStatsCard: $('timeStatsCard'), timeStatsScopeHint: $('timeStatsScopeHint'),
+    timeTabs: $('timeTabs'), timeStatsHead: $('timeStatsHead'), timeStatsBody: $('timeStatsBody'),
+    timeStatsNoData: $('timeStatsNoData'),
+    exportTimeReportItem: $('exportTimeReportItem'),
+    // 其他
+    scopeHint: $('scopeHint'), spScopeHint: $('spScopeHint'),
+    salespersonStatsBody: $('salespersonStatsBody'), salespersonNoData: $('salespersonNoData'),
+    filterStartDate: $('filterStartDate'), filterEndDate: $('filterEndDate'),
+    filterSalesperson: $('filterSalesperson'), salespersonFilterWrap: $('salespersonFilterWrap'),
+    filterCustomer: $('filterCustomer'), filterModel: $('filterModel'), filterOrderNo: $('filterOrderNo'),
+    resetFilterBtn: $('resetFilterBtn'), orderCountHint: $('orderCountHint'),
+    orderGroupsContainer: $('orderGroupsContainer'), ordersNoData: $('ordersNoData'),
+    btnExport: $('btnExport'), btnExportMenu: $('btnExportMenu'), exportMenu: $('exportMenu'),
+    btnStatsReport: $('btnStatsReport'), btnAdvSearch: $('btnAdvSearch'), btnPrint: $('btnPrint'),
+    statsReportModal: $('statsReportModal'), reportContent: $('reportContent'),
+    reportScopeInfo: $('reportScopeInfo'), reportQuickChips: $('reportQuickChips'),
+    exportReportBtn: $('exportReportBtn'),
+    advSearchModal: $('advSearchModal'), advOrderNo: $('advOrderNo'), advSalesperson: $('advSalesperson'),
+    advCustomer: $('advCustomer'), advModel: $('advModel'), advColor: $('advColor'),
+    advPayment: $('advPayment'), advDateFrom: $('advDateFrom'), advDateTo: $('advDateTo'),
+    advFobMin: $('advFobMin'), advFobMax: $('advFobMax'), advTotalMin: $('advTotalMin'),
+    advTotalMax: $('advTotalMax'), advQtyMin: $('advQtyMin'),
+    runAdvSearchBtn: $('runAdvSearchBtn'), resetAdvSearchBtn: $('resetAdvSearchBtn'),
+    settingsModal: $('settingsModal'), jsonbinApiKey: $('jsonbinApiKey'),
+    jsonbinBinId: $('jsonbinBinId'), jsonbinSyncInfo: $('jsonbinSyncInfo'),
+    connectJsonbinBtn: $('connectJsonbinBtn'), disconnectJsonbinBtn: $('disconnectJsonbinBtn'),
+    disconnectWrap: $('disconnectWrap'), jsonbinShareWrap: $('jsonbinShareWrap'),
+    jsonbinShareInfo: $('jsonbinShareInfo'), copyShareInfoBtn: $('copyShareInfoBtn'),
+    pullFromJsonbinBtn: $('pullFromJsonbinBtn'),
+    userManageModal: $('userManageModal'), userListBody: $('userListBody'),
+    newUserRole: $('newUserRole'), newUserName: $('newUserName'), newSalesperson: $('newSalesperson'),
+    newPassword: $('newPassword'), newPasswordConfirm: $('newPasswordConfirm'), addUserBtn: $('addUserBtn'),
+    editOrderModal: $('editOrderModal'), editOrderNo: $('editOrderNo'), editSalesperson: $('editSalesperson'),
+    editOrderDate: $('editOrderDate'), editCustomerName: $('editCustomerName'),
+    editReceiptFile: $('editReceiptFile'), editFileNameDisplay: $('editFileNameDisplay'),
+    editModelRowsContainer: $('editModelRowsContainer'), editAddModelBtn: $('editAddModelBtn'),
+    editModelCountBadge: $('editModelCountBadge'), editPaymentRowsContainer: $('editPaymentRowsContainer'),
+    editAddPaymentBtn: $('editAddPaymentBtn'), editPaymentCountBadge: $('editPaymentCountBadge'),
+    editSummaryOrderTotal: $('editSummaryOrderTotal'), editSummaryReceived: $('editSummaryReceived'),
+    editSummaryOutstanding: $('editSummaryOutstanding'), editSummaryOutstandingWrap: $('editSummaryOutstandingWrap'),
+    saveEditOrderBtn: $('saveEditOrderBtn'),
+    printArea: $('printArea'), toast: $('toast')
+  };
+
+  /* ==================== 工具 ==================== */
+  function generateId() { return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9); }
+  function todayStr() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  function escapeHtml(str) { if (str == null) return ''; return String(str).replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+  function escapeAttr(str) { if (str == null) return ''; return String(str).replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+  function formatMoney(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function padZero(n) { return String(n).padStart(2, '0'); }
+  function formatDateTime(ts) { const d = new Date(ts); return d.getFullYear() + '-' + padZero(d.getMonth()+1) + '-' + padZero(d.getDate()) + ' ' + padZero(d.getHours()) + ':' + padZero(d.getMinutes()); }
+  function makeAvatar(name) { if (!name) return '?'; return String(name).charAt(0).toUpperCase(); }
+  function formatFileSize(bytes) { if (bytes < 1024) return bytes + ' B'; if (bytes < 1024*1024) return (bytes/1024).toFixed(0) + ' KB'; return (bytes/1024/1024).toFixed(1) + ' MB'; }
+  let toastTimer = null;
+  function showToast(msg, type = 'success') {
+    els.toast.textContent = msg;
+    els.toast.className = 'toast show' + (type === 'error' ? ' error' : type === 'success' ? ' success' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => els.toast.classList.remove('show'), 2600);
+  }
+  function downloadBlob(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType || 'text/plain;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  }
+
+  /* ==================== 水单处理 ==================== */
+  function migrateOrderReceipts(order) {
+    if (!order || typeof order !== 'object') return order;
+    if (Array.isArray(order.receipts)) {
+      order.receipts = order.receipts.filter(r => r && typeof r === 'object' && r.fileName);
+      return order;
+    }
+    if (order.fileName) order.receipts = [{ fileName: order.fileName, fileType: order.fileType || '', fileData: order.fileData || null }];
+    else order.receipts = [];
+    delete order.fileName; delete order.fileType; delete order.fileData;
+    return order;
+  }
+  function getOrderReceipts(order) {
+    if (!order) return [];
+    if (Array.isArray(order.receipts)) return order.receipts;
+    if (order.fileName) return [{ fileName: order.fileName, fileType: order.fileType || '', fileData: order.fileData || null }];
+    return [];
+  }
+  function getReceiptsFromRecords(records) {
+    if (!records || records.length === 0) return [];
+    for (const r of records) {
+      const receipts = getOrderReceipts(r);
+      if (receipts.length > 0) return receipts;
+    }
+    return [];
+  }
+  async function readFilesAsDataURLs(files, maxSize) {
+    const results = [];
+    for (const file of files) {
+      const item = { fileName: file.name, fileType: file.type || '', fileData: null, fileSize: file.size };
+      if (file.size <= maxSize) {
+        try { item.fileData = await readFileAsDataURL(file); } catch (err) { item.fileData = null; }
+      }
+      results.push(item);
+    }
+    return results;
+  }
+  function readFileAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /* ==================== 用户与权限 ==================== */
+  function isSuperAdmin(username) { return SUPER_ADMINS.includes(username); }
+  function migrateUsers(users) {
+    if (!users || typeof users !== 'object') return defaultUsers();
+    const migrated = {};
+    for (const [username, user] of Object.entries(users)) {
+      if (!user || typeof user !== 'object') continue;
+      const u = { ...user };
+      if (!u.viewScope) {
+        if (isSuperAdmin(username)) u.viewScope = { type: 'all', excluded: [] };
+        else if (u.role === 'admin') u.viewScope = { type: 'all', excluded: ['cookie'] };
+        else u.viewScope = { type: 'self' };
+      }
+      if (!u.avatar) u.avatar = makeAvatar(u.salesperson);
+      if (!u.displayName) u.displayName = u.salesperson;
+      migrated[username] = u;
+    }
+    const defaults = defaultUsers();
+    SUPER_ADMINS.forEach(sa => { if (!migrated[sa]) migrated[sa] = defaults[sa]; });
+    return migrated;
+  }
+  function migrateOrders(orders) { if (!Array.isArray(orders)) return []; return orders.map(o => migrateOrderReceipts(o)); }
+  function findUser(username) {
+    if (!username || !state.users) return null;
+    const trimmed = username.trim(); if (!trimmed) return null;
+    if (state.users[trimmed]) return { key: trimmed, user: state.users[trimmed] };
+    const lower = trimmed.toLowerCase();
+    const key = Object.keys(state.users).find(k => k.toLowerCase() === lower);
+    if (key) return { key, user: state.users[key] };
+    return null;
+  }
+  function getSalespersonList() {
+    const names = new Set();
+    if (state.users && typeof state.users === 'object') Object.values(state.users).forEach(u => { if (u && u.salesperson) names.add(u.salesperson); });
+    state.orders.forEach(o => { if (o.salesperson) names.add(o.salesperson); });
+    return [...names].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  }
+  function getCurrentViewScope() {
+    if (!currentUser) return { type: 'self' };
+    const u = state.users[currentUser.username];
+    if (!u) return { type: 'self' };
+    return u.viewScope || (u.role === 'admin' ? { type: 'all', excluded: [] } : { type: 'self' });
+  }
+  function getVisibleSalespersons() {
+    const scope = getCurrentViewScope();
+    const all = getSalespersonList();
+    if (scope.type === 'all') { const excluded = scope.excluded || []; return all.filter(sp => !excluded.includes(sp)); }
+    if (scope.type === 'self') return currentSalesperson ? [currentSalesperson] : [];
+    if (scope.type === 'list') { const allowed = scope.allowedSalespersons || []; return all.filter(sp => allowed.includes(sp)); }
+    return [];
+  }
+  function canViewOrder(order) {
+    const scope = getCurrentViewScope();
+    if (scope.type === 'all') { const excluded = scope.excluded || []; return !excluded.includes(order.salesperson); }
+    if (scope.type === 'self') return order.salesperson === currentSalesperson;
+    if (scope.type === 'list') return (scope.allowedSalespersons || []).includes(order.salesperson);
+    return false;
+  }
+  function canEditOrder(order) {
+    if (!currentUser) return false;
+    if (!canViewOrder(order)) return false;
+    if (currentRole === 'admin') return true;
+    return order.salesperson === currentSalesperson;
+  }
+  function isCurrentSuperAdmin() { return currentUser && isSuperAdmin(currentUser.username); }
+  function canDeleteUser(username) {
+    if (!currentUser) return false;
+    if (username === currentUser.username) return false;
+    if (isSuperAdmin(username)) return false;
+    return true;
+  }
+
+  /* ==================== 收款工具 ==================== */
+  function normalizePayments(payments) { if (!Array.isArray(payments)) return []; return payments.filter(p => p && typeof p === 'object').map(p => ({ date: p.date || '', amount: Number(p.amount) || 0 })); }
+  function sumPayments(payments) { if (!Array.isArray(payments)) return 0; return payments.reduce((s, p) => s + (Number(p.amount) || 0), 0); }
+  function getPaymentsFromRecords(records) { if (!records || records.length === 0) return []; return normalizePayments(records[0].payments || []); }
+
+  /* ==================== 时间统计 ==================== */
+  function getPeriodKey(dateStr, period) {
+    if (!dateStr) return '未知日期';
+    const year = dateStr.slice(0, 4);
+    const month = dateStr.slice(5, 7);
+    if (period === 'day') return dateStr;
+    if (period === 'month') return year + '-' + month;
+    if (period === 'year') return year + ' 年';
+    if (period === 'quarter') {
+      const m = parseInt(month, 10);
+      const q = Math.ceil(m / 3);
+      return year + ' 年第 ' + q + ' 季度';
+    }
+    return dateStr;
+  }
+
+  function computeTimeStats(orders, period) {
+    const groups = new Map();
+    orders.forEach(o => {
+      const key = getPeriodKey(o.orderDate, period);
+      if (!groups.has(key)) {
+        groups.set(key, { orderNos: new Set(), records: 0, qty: 0, amount: 0, received: 0, seenOrderNos: new Set() });
+      }
+      const g = groups.get(key);
+      g.orderNos.add(o.orderNo || '');
+      g.records++;
+      g.qty += Number(o.quantity) || 0;
+      g.amount += Number(o.totalPrice) || 0;
+      if (!g.seenOrderNos.has(o.orderNo)) {
+        g.seenOrderNos.add(o.orderNo);
+        g.received += sumPayments(o.payments);
+      }
+    });
+    // 排序（降序：新的在前）
+    const arr = [...groups.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+    return arr;
+  }
+
+  function renderTimeStats() {
+    // 仅管理员可见
+    if (currentRole !== 'admin') {
+      els.timeStatsCard.style.display = 'none';
+      els.exportTimeReportItem.style.display = 'none';
+      return;
+    }
+    els.timeStatsCard.style.display = 'block';
+    els.exportTimeReportItem.style.display = 'flex';
+
+    const scope = getCurrentViewScope();
+    let scopeText = '';
+    if (scope.type === 'all' && (!scope.excluded || scope.excluded.length === 0)) {
+      scopeText = '全部业务员（含 cookie）';
+    } else if (scope.type === 'all') {
+      scopeText = '除 ' + scope.excluded.join('、') + ' 外全部';
+    } else {
+      scopeText = '仅 ' + currentSalesperson;
+    }
+    els.timeStatsScopeHint.textContent = scopeText;
+
+    // 使用 getFilteredOrders()，它会自动应用 viewScope 权限过滤
+    const filtered = getFilteredOrders();
+    const arr = computeTimeStats(filtered, timeStatsPeriod);
+
+    const periodLabel = { day: '日期', month: '月份', quarter: '季度', year: '年份' }[timeStatsPeriod];
+
+    els.timeStatsHead.innerHTML = '<tr>' +
+      '<th>' + periodLabel + '</th>' +
+      '<th class="num">订单数</th>' +
+      '<th class="num">记录数</th>' +
+      '<th class="num">总数量</th>' +
+      '<th class="num">订单金额(USD)</th>' +
+      '<th class="num">已收款(USD)</th>' +
+      '<th class="num">未收款(USD)</th>' +
+    '</tr>';
+
+    if (arr.length === 0) {
+      els.timeStatsBody.innerHTML = '';
+      els.timeStatsNoData.style.display = 'block';
+      return;
+    }
+    els.timeStatsNoData.style.display = 'none';
+
+    let totalCount = 0, totalRecords = 0, totalQty = 0, totalAmt = 0, totalRecv = 0;
+    arr.forEach(([key, g]) => {
+      totalCount += g.orderNos.size;
+      totalRecords += g.records;
+      totalQty += g.qty;
+      totalAmt += g.amount;
+      totalRecv += g.received;
+    });
+
+    els.timeStatsBody.innerHTML = arr.map(([key, g]) => {
+      const outstanding = g.amount - g.received;
+      return '<tr>' +
+        '<td style="font-weight:700;color:var(--primary-dark);">' + escapeHtml(key) + '</td>' +
+        '<td class="num">' + g.orderNos.size + '</td>' +
+        '<td class="num">' + g.records + '</td>' +
+        '<td class="num">' + g.qty + '</td>' +
+        '<td class="num" style="font-weight:700;">$' + formatMoney(g.amount) + '</td>' +
+        '<td class="num" style="font-weight:700;color:var(--paid);">$' + formatMoney(g.received) + '</td>' +
+        '<td class="num" style="font-weight:700;color:' + (outstanding > 0.01 ? 'var(--warning)' : 'var(--success)') + ';">$' + formatMoney(outstanding) + '</td>' +
+      '</tr>';
+    }).join('') + '<tr style="background:#f3f9ff; font-weight:800;">' +
+      '<td style="color:var(--primary-dark);">合 计</td>' +
+      '<td class="num">' + totalCount + '</td>' +
+      '<td class="num">' + totalRecords + '</td>' +
+      '<td class="num">' + totalQty + '</td>' +
+      '<td class="num">$' + formatMoney(totalAmt) + '</td>' +
+      '<td class="num" style="color:var(--paid);">$' + formatMoney(totalRecv) + '</td>' +
+      '<td class="num" style="color:' + (totalAmt - totalRecv > 0.01 ? 'var(--warning)' : 'var(--success)') + ';">$' + formatMoney(totalAmt - totalRecv) + '</td>' +
+    '</tr>';
+  }
+
+  function exportTimeStatsReport() {
+    if (currentRole !== 'admin') { showToast('无权操作', 'error'); return; }
+    const filtered = getFilteredOrders();
+    const arr = computeTimeStats(filtered, timeStatsPeriod);
+    if (arr.length === 0) { showToast('没有可导出的数据', 'error'); return; }
+
+    const periodLabel = { day: '日期', month: '月份', quarter: '季度', year: '年份' }[timeStatsPeriod];
+    const ts = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
+    html += '<head><meta charset="UTF-8">';
+    html += '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>时间统计</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->';
+    html += '<style>table{border-collapse:collapse;font-family:"Microsoft YaHei",Arial,sans-serif;}';
+    html += 'th,td{border:1px solid #b8d4e8;padding:6px 10px;font-size:12px;}';
+    html += 'th{background:#d0e4f2;color:#0b2a4a;font-weight:bold;text-align:left;}';
+    html += '.title{font-size:16px;font-weight:bold;color:#1e5f7a;padding:10px 0;}';
+    html += '.sub{font-size:11px;color:#5a7c94;padding-bottom:10px;}';
+    html += '.num{text-align:right;}';
+    html += '.total td{background:#f3f9ff;font-weight:bold;}';
+    html += '</style></head><body>';
+    html += '<div class="title">按时间统计报表（' + periodLabel + '）</div>';
+    html += '<div class="sub">导出时间：' + formatDateTime(now.getTime()) + ' · 数据范围：' + (isCurrentSuperAdmin() ? '全部业务员（含 cookie）' : '除 cookie 外全部业务员') + '</div>';
+    html += '<table><thead><tr>';
+    html += '<th>' + periodLabel + '</th><th class="num">订单数</th><th class="num">记录数</th><th class="num">总数量</th>';
+    html += '<th class="num">订单金额(USD)</th><th class="num">已收款(USD)</th><th class="num">未收款(USD)</th>';
+    html += '</tr></thead><tbody>';
+
+    let totalCount = 0, totalRecords = 0, totalQty = 0, totalAmt = 0, totalRecv = 0;
+    arr.forEach(([key, g]) => {
+      totalCount += g.orderNos.size;
+      totalRecords += g.records;
+      totalQty += g.qty;
+      totalAmt += g.amount;
+      totalRecv += g.received;
+      const outstanding = g.amount - g.received;
+      html += '<tr>' +
+        '<td>' + escapeHtml(key) + '</td>' +
+        '<td class="num">' + g.orderNos.size + '</td>' +
+        '<td class="num">' + g.records + '</td>' +
+        '<td class="num">' + g.qty + '</td>' +
+        '<td class="num">' + g.amount.toFixed(2) + '</td>' +
+        '<td class="num">' + g.received.toFixed(2) + '</td>' +
+        '<td class="num">' + outstanding.toFixed(2) + '</td>' +
+      '</tr>';
+    });
+    html += '</tbody><tfoot><tr class="total">';
+    html += '<td>合计</td>';
+    html += '<td class="num">' + totalCount + '</td>';
+    html += '<td class="num">' + totalRecords + '</td>';
+    html += '<td class="num">' + totalQty + '</td>';
+    html += '<td class="num">' + totalAmt.toFixed(2) + '</td>';
+    html += '<td class="num">' + totalRecv.toFixed(2) + '</td>';
+    html += '<td class="num">' + (totalAmt - totalRecv).toFixed(2) + '</td>';
+    html += '</tr></tfoot></table></body></html>';
+
+    downloadBlob(html, '按时间统计_' + periodLabel + '_' + ts + '.xls', 'application/vnd.ms-excel;charset=utf-8');
+    showToast('已导出按' + periodLabel + '统计报表');
+  }
+
+  /* ==================== 导出（订单） ==================== */
+  function escapeCsv(val) {
+    if (val == null) return '';
+    const s = String(val);
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+  function receiptsToStr(receipts) {
+    if (!Array.isArray(receipts) || receipts.length === 0) return '';
+    return receipts.map(r => r.fileName || '').filter(Boolean).join(' | ');
+  }
+  function ordersToCSV(orders) {
+    const headers = ['订单编号','业务员','订单时间','客户名称','车型','数量','颜色','FOB价格(USD)','总价(USD)','收款情况','收款金额合计(USD)','水单文件'];
+    const rows = orders.map(o => {
+      const payments = normalizePayments(o.payments);
+      const received = sumPayments(payments);
+      const receipts = getOrderReceipts(o);
+      return [o.orderNo||'', o.salesperson||'', o.orderDate||'', o.customerName||'', o.carModel||'', o.quantity||0, o.color||'', Number(o.fobPrice||0).toFixed(2), Number(o.totalPrice||0).toFixed(2), o.paymentStatus||'', received.toFixed(2), receiptsToStr(receipts)];
+    });
+    const lines = [headers.map(escapeCsv).join(',')];
+    rows.forEach(r => lines.push(r.map(escapeCsv).join(',')));
+    return '\uFEFF' + lines.join('\r\n');
+  }
+  function ordersToExcelHTML(orders, title) {
+    const now = new Date();
+    const exportTime = formatDateTime(now.getTime());
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
+    html += '<head><meta charset="UTF-8">';
+    html += '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>订单数据</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->';
+    html += '<style>table{border-collapse:collapse;font-family:"Microsoft YaHei",Arial,sans-serif;}th,td{border:1px solid #b8d4e8;padding:6px 10px;font-size:12px;}th{background:#d0e4f2;color:#0b2a4a;font-weight:bold;text-align:left;}.title{font-size:16px;font-weight:bold;color:#1e5f7a;padding:10px 0;}.sub{font-size:11px;color:#5a7c94;padding-bottom:10px;}.num{text-align:right;}.total-row td{background:#f3f9ff;font-weight:bold;}</style></head><body>';
+    html += '<div class="title">' + escapeHtml(title) + '</div>';
+    html += '<div class="sub">导出时间：' + exportTime + ' · 记录数：' + orders.length + ' 条</div>';
+    html += '<table><thead><tr>';
+    html += '<th>订单编号</th><th>业务员</th><th>订单时间</th><th>客户名称</th><th>车型</th><th class="num">数量</th><th>颜色</th><th class="num">FOB价格(USD)</th><th class="num">总价(USD)</th><th>收款情况</th><th class="num">已收款(USD)</th><th>水单文件</th>';
+    html += '</tr></thead><tbody>';
+    let totalQty = 0, totalAmt = 0, totalReceived = 0;
+    const seenOrderNos = new Set();
+    orders.forEach(o => {
+      totalQty += Number(o.quantity) || 0;
+      totalAmt += Number(o.totalPrice) || 0;
+      const payments = normalizePayments(o.payments);
+      const received = sumPayments(payments);
+      if (!seenOrderNos.has(o.orderNo)) { seenOrderNos.add(o.orderNo); totalReceived += received; }
+      const receipts = getOrderReceipts(o);
+      html += '<tr>' +
+        '<td>' + escapeHtml(o.orderNo || '') + '</td>' +
+        '<td>' + escapeHtml(o.salesperson || '') + '</td>' +
+        '<td>' + escapeHtml(o.orderDate || '') + '</td>' +
+        '<td>' + escapeHtml(o.customerName || '') + '</td>' +
+        '<td>' + escapeHtml(o.carModel || '') + '</td>' +
+        '<td class="num">' + (o.quantity || 0) + '</td>' +
+        '<td>' + escapeHtml(o.color || '') + '</td>' +
+        '<td class="num">' + Number(o.fobPrice || 0).toFixed(2) + '</td>' +
+        '<td class="num">' + Number(o.totalPrice || 0).toFixed(2) + '</td>' +
+        '<td>' + escapeHtml(o.paymentStatus || '') + '</td>' +
+        '<td class="num">' + received.toFixed(2) + '</td>' +
+        '<td>' + escapeHtml(receiptsToStr(receipts)) + '</td>' +
+      '</tr>';
+    });
+    html += '</tbody><tfoot>';
+    html += '<tr class="total-row"><td colspan="5">合计</td><td class="num">' + totalQty + '</td><td></td><td></td><td class="num">' + totalAmt.toFixed(2) + '</td><td></td><td class="num">' + totalReceived.toFixed(2) + '</td><td></td></tr>';
+    html += '</tfoot></table></body></html>';
+    return html;
+  }
+  function exportOrders(orders, baseName, format) {
+    if (orders.length === 0) { showToast('当前没有可导出的订单', 'error'); return; }
+    const ts = new Date().toISOString().slice(0, 10);
+    if (format === 'csv') downloadBlob(ordersToCSV(orders), baseName + '_' + ts + '.csv', 'text/csv;charset=utf-8');
+    else downloadBlob(ordersToExcelHTML(orders, baseName), baseName + '_' + ts + '.xls', 'application/vnd.ms-excel;charset=utf-8');
+    showToast('已导出 ' + orders.length + ' 条记录');
+  }
+  function exportSingleOrderGroup(orderNo) {
+    const records = state.orders.filter(o => o.orderNo === orderNo && canViewOrder(o));
+    if (records.length === 0) { showToast('该订单无数据', 'error'); return; }
+    exportOrders(records, '订单_' + orderNo, 'excel');
+  }
+
+  /* ==================== 统计报表 ==================== */
+  function computeStats(orders) {
+    const result = { total: { orderNos: new Set(), records: orders.length, qty: 0, amount: 0, received: 0 }, bySalesperson: {}, byCustomer: {}, byModel: {}, byPayment: {}, byMonth: {} };
+    const seenOrderNos = new Set();
+    orders.forEach(o => {
+      const qty = Number(o.quantity) || 0, amt = Number(o.totalPrice) || 0;
+      const payments = normalizePayments(o.payments);
+      const received = sumPayments(payments);
+      const no = o.orderNo || '（无编号）';
+      const sp = o.salesperson || '未署名';
+      const cust = o.customerName || '未填写';
+      const model = o.carModel || '未填写';
+      const pay = o.paymentStatus || '未收款';
+      const month = (o.orderDate || '').slice(0, 7) || '未知月份';
+      result.total.orderNos.add(no);
+      result.total.qty += qty;
+      result.total.amount += amt;
+      if (!seenOrderNos.has(no)) { seenOrderNos.add(no); result.total.received += received; }
+      const addTo = (obj, key, isFirst) => {
+        if (!obj[key]) obj[key] = { orderNos: new Set(), records: 0, qty: 0, amount: 0, received: 0 };
+        obj[key].orderNos.add(no); obj[key].records++; obj[key].qty += qty; obj[key].amount += amt;
+        if (isFirst) obj[key].received += received;
+      };
+      const isFirst = (obj) => !obj[sp] || !obj[sp].orderNos.has(no);
+      addTo(result.bySalesperson, sp, isFirst(result.bySalesperson));
+      addTo(result.byCustomer, cust, isFirst(result.byCustomer));
+      addTo(result.byModel, model, isFirst(result.byModel));
+      addTo(result.byPayment, pay, isFirst(result.byPayment));
+      addTo(result.byMonth, month, isFirst(result.byMonth));
+    });
+    return result;
+  }
+  function statsToTableRows(mapObj) { return Object.entries(mapObj).map(([k, v]) => ({ key: k, count: v.orderNos.size, records: v.records, qty: v.qty, amount: v.amount, received: v.received || 0 })).sort((a, b) => b.amount - a.amount); }
+
+  function renderStatsReport() {
+    const orders = getFilteredOrders();
+    const stats = computeStats(orders);
+    els.reportScopeInfo.textContent = '当前筛选范围内共 ' + stats.total.records + ' 条记录，' + stats.total.orderNos.size + ' 个订单编号 · 总金额 $' + formatMoney(stats.total.amount) + ' · 已收款 $' + formatMoney(stats.total.received);
+    let html = '';
+    html += '<div class="report-section"><h4>📌 总览</h4><table class="report-table"><thead><tr><th>订单编号数</th><th class="num">车型记录数</th><th class="num">总数量</th><th class="num">订单总金额(USD)</th><th class="num">已收款(USD)</th><th class="num">未收款(USD)</th></tr></thead><tbody><tr>';
+    html += '<td>' + stats.total.orderNos.size + '</td><td class="num">' + stats.total.records + '</td><td class="num">' + stats.total.qty + '</td>';
+    html += '<td class="num">$' + formatMoney(stats.total.amount) + '</td><td class="num">$' + formatMoney(stats.total.received) + '</td><td class="num">$' + formatMoney(stats.total.amount - stats.total.received) + '</td></tr></tbody></table></div>';
+
+    const sections = [
+      { key: 'salesperson', title: '👥 按业务员统计', firstCol: '业务员' },
+      { key: 'customer', title: '🏢 按客户统计', firstCol: '客户名称' },
+      { key: 'model', title: '🚗 按车型统计', firstCol: '车型' },
+      { key: 'payment', title: '💰 按收款情况统计', firstCol: '收款情况' }
+    ];
+    sections.forEach(sec => {
+      if (currentReportType !== 'all' && currentReportType !== sec.key) return;
+      const rows = statsToTableRows(stats['by' + sec.key.charAt(0).toUpperCase() + sec.key.slice(1)]);
+      html += '<div class="report-section"><h4>' + sec.title + '</h4>';
+      if (rows.length === 0) html += '<div class="report-empty">暂无数据</div>';
+      else {
+        html += '<table class="report-table"><thead><tr><th>' + sec.firstCol + '</th><th class="num">订单数</th><th class="num">记录数</th><th class="num">总数量</th><th class="num">订单金额(USD)</th><th class="num">已收款(USD)</th><th class="num">占比</th></tr></thead><tbody>';
+        rows.forEach(r => {
+          const pct = stats.total.amount > 0 ? (r.amount / stats.total.amount * 100).toFixed(1) : 0;
+          html += '<tr><td>' + escapeHtml(r.key) + '</td><td class="num">' + r.count + '</td><td class="num">' + r.records + '</td><td class="num">' + r.qty + '</td><td class="num">$' + formatMoney(r.amount) + '</td><td class="num">$' + formatMoney(r.received) + '</td><td class="num">' + pct + '%</td></tr>';
+        });
+        if (sec.key === 'salesperson') {
+          html += '</tbody><tfoot><tr><td>合计</td><td class="num">' + stats.total.orderNos.size + '</td><td class="num">' + stats.total.records + '</td><td class="num">' + stats.total.qty + '</td><td class="num">$' + formatMoney(stats.total.amount) + '</td><td class="num">$' + formatMoney(stats.total.received) + '</td><td class="num">100%</td></tr></tfoot>';
+        } else html += '</tbody>';
+        html += '</table>';
+      }
+      html += '</div>';
+    });
+
+    if (currentReportType === 'all' || currentReportType === 'month') {
+      const entries = Object.entries(stats.byMonth).map(([k, v]) => ({ month: k, count: v.orderNos.size, records: v.records, qty: v.qty, amount: v.amount, received: v.received })).sort((a, b) => a.month.localeCompare(b.month));
+      html += '<div class="report-section"><h4>📅 按月份统计</h4>';
+      if (entries.length === 0) html += '<div class="report-empty">暂无数据</div>';
+      else {
+        html += '<table class="report-table"><thead><tr><th>月份</th><th class="num">订单数</th><th class="num">记录数</th><th class="num">总数量</th><th class="num">订单金额(USD)</th><th class="num">已收款(USD)</th></tr></thead><tbody>';
+        entries.forEach(r => {
+          html += '<tr><td>' + escapeHtml(r.month) + '</td><td class="num">' + r.count + '</td><td class="num">' + r.records + '</td><td class="num">' + r.qty + '</td><td class="num">$' + formatMoney(r.amount) + '</td><td class="num">$' + formatMoney(r.received) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+      }
+      html += '</div>';
+    }
+    els.reportContent.innerHTML = html;
+  }
+
+  function exportStatsReport() {
+    const orders = getFilteredOrders();
+    const stats = computeStats(orders);
+    const ts = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8">';
+    html += '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>统计报表</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->';
+    html += '<style>table{border-collapse:collapse;font-family:"Microsoft YaHei",Arial,sans-serif;}th,td{border:1px solid #b8d4e8;padding:6px 10px;font-size:12px;}th{background:#d0e4f2;color:#0b2a4a;font-weight:bold;text-align:left;}.title{font-size:16px;font-weight:bold;color:#1e5f7a;padding:10px 0;}.sub{font-size:11px;color:#5a7c94;padding-bottom:10px;}.section{font-size:14px;font-weight:bold;color:#1e5f7a;padding:14px 0 6px;}.num{text-align:right;}</style></head><body>';
+    html += '<div class="title">订单统计报表</div><div class="sub">导出时间：' + formatDateTime(now.getTime()) + ' · 记录数：' + orders.length + ' 条</div>';
+    html += '<div class="section">📌 总览</div><table><tr><th>订单编号数</th><th class="num">车型记录数</th><th class="num">总数量</th><th class="num">订单总金额(USD)</th><th class="num">已收款(USD)</th><th class="num">未收款(USD)</th></tr>';
+    html += '<tr><td>' + stats.total.orderNos.size + '</td><td class="num">' + stats.total.records + '</td><td class="num">' + stats.total.qty + '</td><td class="num">' + stats.total.amount.toFixed(2) + '</td><td class="num">' + stats.total.received.toFixed(2) + '</td><td class="num">' + (stats.total.amount - stats.total.received).toFixed(2) + '</td></tr></table>';
+    function section(title, mapObj, keyName) {
+      const rows = statsToTableRows(mapObj);
+      if (rows.length === 0) return '';
+      let s = '<div class="section">' + title + '</div><table><tr><th>' + keyName + '</th><th class="num">订单数</th><th class="num">记录数</th><th class="num">总数量</th><th class="num">订单金额(USD)</th><th class="num">已收款(USD)</th><th class="num">占比</th></tr>';
+      rows.forEach(r => {
+        const pct = stats.total.amount > 0 ? (r.amount / stats.total.amount * 100).toFixed(1) : 0;
+        s += '<tr><td>' + escapeHtml(r.key) + '</td><td class="num">' + r.count + '</td><td class="num">' + r.records + '</td><td class="num">' + r.qty + '</td><td class="num">' + r.amount.toFixed(2) + '</td><td class="num">' + r.received.toFixed(2) + '</td><td class="num">' + pct + '%</td></tr>';
+      });
+      return s + '</table>';
+    }
+    html += section('👥 按业务员统计', stats.bySalesperson, '业务员');
+    html += section('🏢 按客户统计', stats.byCustomer, '客户名称');
+    html += section('🚗 按车型统计', stats.byModel, '车型');
+    html += section('💰 按收款情况统计', stats.byPayment, '收款情况');
+    const monthRows = Object.entries(stats.byMonth).map(([k, v]) => ({ month: k, count: v.orderNos.size, records: v.records, qty: v.qty, amount: v.amount, received: v.received })).sort((a, b) => a.month.localeCompare(b.month));
+    if (monthRows.length > 0) {
+      html += '<div class="section">📅 按月份统计</div><table><tr><th>月份</th><th class="num">订单数</th><th class="num">记录数</th><th class="num">总数量</th><th class="num">订单金额(USD)</th><th class="num">已收款(USD)</th></tr>';
+      monthRows.forEach(r => {
+        html += '<tr><td>' + escapeHtml(r.month) + '</td><td class="num">' + r.count + '</td><td class="num">' + r.records + '</td><td class="num">' + r.qty + '</td><td class="num">' + r.amount.toFixed(2) + '</td><td class="num">' + r.received.toFixed(2) + '</td></tr>';
+      });
+      html += '</table>';
+    }
+    html += '</body></html>';
+    downloadBlob(html, '订单统计报表_' + ts + '.xls', 'application/vnd.ms-excel;charset=utf-8');
+    showToast('统计报表已导出');
+  }
+
+  /* ==================== 打印 ==================== */
+  function printOrders() {
+    const orders = getFilteredOrders();
+    if (orders.length === 0) { showToast('没有可打印的数据', 'error'); return; }
+    const stats = computeStats(orders);
+    const now = new Date();
+    let html = '<style>body{font-family:"Microsoft YaHei",Arial,sans-serif;padding:20px;color:#0b2a4a;}h1{font-size:20px;color:#1e5f7a;margin-bottom:6px;}.sub{font-size:12px;color:#5a7c94;margin-bottom:16px;}h2{font-size:15px;color:#1e5f7a;margin:18px 0 8px;padding-bottom:4px;border-bottom:1.5px solid #c9dded;}table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:12px;}th,td{border:1px solid #b8d4e8;padding:5px 8px;text-align:left;}th{background:#d0e4f2;font-weight:bold;}.num{text-align:right;}.summary{background:#f3f9ff;font-size:12px;padding:10px 14px;border-radius:8px;margin-bottom:14px;}.summary span{margin-right:20px;}.summary b{color:#1e5f7a;}</style>';
+    html += '<h1>📦 客户订单统计报表</h1>';
+    html += '<div class="sub">打印时间：' + formatDateTime(now.getTime()) + ' · 记录数：' + orders.length + ' 条</div>';
+    html += '<div class="summary"><span>订单编号数：<b>' + stats.total.orderNos.size + '</b></span><span>车型记录数：<b>' + stats.total.records + '</b></span><span>总数量：<b>' + stats.total.qty + '</b></span><span>订单总金额：<b>$' + formatMoney(stats.total.amount) + '</b></span><span>已收款：<b>$' + formatMoney(stats.total.received) + '</b></span><span>未收款：<b>$' + formatMoney(stats.total.amount - stats.total.received) + '</b></span></div>';
+    html += '<h2>📋 订单明细</h2><table><thead><tr><th>订单编号</th><th>业务员</th><th>日期</th><th>客户</th><th>车型</th><th class="num">数量</th><th>颜色</th><th class="num">FOB</th><th class="num">总价</th><th>收款</th></tr></thead><tbody>';
+    orders.sort((a, b) => (a.orderNo < b.orderNo ? 1 : -1)).forEach(o => {
+      html += '<tr><td>' + escapeHtml(o.orderNo) + '</td><td>' + escapeHtml(o.salesperson) + '</td><td>' + escapeHtml(o.orderDate) + '</td><td>' + escapeHtml(o.customerName) + '</td><td>' + escapeHtml(o.carModel) + '</td><td class="num">' + o.quantity + '</td><td>' + escapeHtml(o.color) + '</td><td class="num">$' + formatMoney(o.fobPrice) + '</td><td class="num">$' + formatMoney(o.totalPrice) + '</td><td>' + escapeHtml(o.paymentStatus) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    els.printArea.innerHTML = html;
+    els.printArea.style.display = 'block';
+    setTimeout(() => { window.print(); setTimeout(() => { els.printArea.style.display = 'none'; }, 500); }, 100);
+  }
+
+  /* ==================== 数据可见性 ==================== */
+  function getVisibleOrders() { return state.orders.filter(canViewOrder); }
+  function getFilteredOrders() {
+    const visible = getVisibleOrders();
+    const start = els.filterStartDate.value;
+    const end = els.filterEndDate.value;
+    const sp = els.filterSalesperson.value;
+    const customer = els.filterCustomer.value.trim().toLowerCase();
+    const model = els.filterModel.value.trim().toLowerCase();
+    const orderNoFilter = els.filterOrderNo.value.trim().toLowerCase();
+    return visible.filter(o => {
+      if (start && o.orderDate < start) return false;
+      if (end && o.orderDate > end) return false;
+      if (sp && o.salesperson !== sp) return false;
+      if (customer && !(o.customerName || '').toLowerCase().includes(customer)) return false;
+      if (model && !(o.carModel || '').toLowerCase().includes(model)) return false;
+      if (orderNoFilter && !(o.orderNo || '').toLowerCase().includes(orderNoFilter)) return false;
+      return true;
+    });
+  }
+
+  /* ==================== 登录 ==================== */
+  function performLogin(username, password) {
+    const found = findUser(username);
+    if (!found) { els.loginError.textContent = '❌ 用户名或密码错误'; return false; }
+    if (password !== found.user.password) { els.loginError.textContent = '❌ 用户名或密码错误'; return false; }
+    const user = found.user;
+    currentUser = { username: found.key, role: user.role, salesperson: user.salesperson, displayName: user.displayName || user.salesperson, avatar: user.avatar || makeAvatar(user.salesperson) };
+    currentRole = user.role;
+    currentSalesperson = user.salesperson;
+    localStorage.setItem(LOGIN_KEY, JSON.stringify(currentUser));
+    els.loginError.textContent = '';
+    enterMainApp();
+    return true;
+  }
+  function enterMainApp() {
+    els.loginOverlay.classList.add('hidden');
+    els.mainApp.style.display = 'block';
+    els.userAvatar.textContent = currentUser.avatar;
+    els.userDisplayName.textContent = currentUser.displayName;
+    els.currentUserPill.classList.toggle('admin', currentRole === 'admin');
+    els.currentUserPill.classList.toggle('super', isCurrentSuperAdmin());
+    if (isCurrentSuperAdmin()) els.userAvatar.style.background = 'linear-gradient(135deg, #7c2d12, #dc2626)';
+    else if (currentRole === 'admin') els.userAvatar.style.background = 'linear-gradient(135deg, #d97706, #f59e0b)';
+    else els.userAvatar.style.background = 'var(--primary)';
+
+    if (currentRole === 'admin') { els.manageUsersBtn.style.display = 'flex'; els.salespersonFilterWrap.style.display = 'flex'; }
+    else { els.manageUsersBtn.style.display = 'none'; els.salespersonFilterWrap.style.display = 'none'; }
+
+    els.orderDate.value = todayStr();
+    clearOrderForm();
+    renderAll();
+    showToast('欢迎回来，' + currentUser.displayName + '！');
+  }
+  function logout() {
+    if (!confirm('确定退出登录吗？')) return;
+    localStorage.removeItem(LOGIN_KEY);
+    currentUser = null; currentRole = 'admin'; currentSalesperson = '';
+    stopJsonbinPolling();
+    els.mainApp.style.display = 'none';
+    els.loginOverlay.classList.remove('hidden');
+    els.loginUsername.value = ''; els.loginPassword.value = ''; els.loginError.textContent = '';
+    setTimeout(() => els.loginUsername.focus(), 100);
+  }
+  function bindLogin() {
+    els.loginBtn.addEventListener('click', () => {
+      const username = els.loginUsername.value.trim();
+      const password = els.loginPassword.value;
+      if (!username || !password) { els.loginError.textContent = '请输入用户名和密码'; return; }
+      performLogin(username, password);
+    });
+    [els.loginUsername, els.loginPassword].forEach(el => {
+      el.addEventListener('keypress', e => { if (e.key === 'Enter') els.loginBtn.click(); });
+    });
+    els.logoutBtn.addEventListener('click', logout);
+  }
+
+  /* ==================== 存储 ==================== */
+  function loadFromStorage() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.orders)) {
+          state.orders = migrateOrders(parsed.orders);
+          state.users = migrateUsers(parsed.users);
+          state.lastUpdated = parsed.lastUpdated || 0;
+          state.updatedBy = parsed.updatedBy || '';
+        } else state.users = defaultUsers();
+      } else state.users = defaultUsers();
+    } catch (e) { console.error(e); state.orders = []; state.users = defaultUsers(); }
+    state.users = migrateUsers(state.users);
+  }
+  function saveToStorage(broadcast = true, pushCloud = true) {
+    state.lastUpdated = Date.now();
+    state.updatedBy = currentSalesperson || currentRole;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    catch (e) { showToast('本地存储空间不足，请删除部分带水单的订单', 'error'); }
+    if (broadcast && bc) { try { bc.postMessage({ type: 'state-update', lastUpdated: state.lastUpdated }); } catch (e) {} }
+    if (pushCloud && jsonbinApiKey && jsonbinBinId) scheduleJsonbinPush();
+  }
+
+  /* ==================== JSONBin ==================== */
+  function updateSyncStatus(status, text) {
+    const el = els.syncStatus;
+    el.className = 'sync-status';
+    if (status === 'online') el.classList.add('online');
+    if (status === 'syncing') el.classList.add('syncing');
+    if (status === 'error') el.classList.add('error');
+    el.innerHTML = '<span class="dot"></span> ' + escapeHtml(text);
+  }
+  function setJsonbinSyncInfo(text) { if (els.jsonbinSyncInfo) els.jsonbinSyncInfo.value = text; }
+  async function jsonbinPush() {
+    if (!jsonbinApiKey || !jsonbinBinId || isSyncing) return;
+    isSyncing = true; updateSyncStatus('syncing', '上传中...');
+    setJsonbinSyncInfo('正在上传到 JSONBin...');
+    try {
+      const res = await fetch(JSONBIN_API + '/b/' + jsonbinBinId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Master-Key': jsonbinApiKey, 'X-Bin-Versioning': 'false' },
+        body: JSON.stringify(state)
+      });
+      if (res.ok) { updateSyncStatus('online', '已同步'); setJsonbinSyncInfo('同步成功 · ' + new Date().toLocaleTimeString()); }
+      else { const err = await res.json().catch(() => ({})); updateSyncStatus('error', '同步失败'); setJsonbinSyncInfo('同步失败：' + (err.message || res.status)); }
+    } catch (e) { updateSyncStatus('error', '网络错误'); setJsonbinSyncInfo('上传失败：' + e.message); }
+    finally { isSyncing = false; }
+  }
+  function scheduleJsonbinPush() { clearTimeout(pushTimer); pushTimer = setTimeout(jsonbinPush, 800); }
+  async function jsonbinPull() {
+    if (!jsonbinApiKey || !jsonbinBinId || isSyncing) return;
+    try {
+      const res = await fetch(JSONBIN_API + '/b/' + jsonbinBinId + '/latest', { headers: { 'X-Master-Key': jsonbinApiKey, 'Accept': 'application/json' } });
+      if (!res.ok) return;
+      const data = await res.json();
+      const record = data.record || data;
+      if (record && Array.isArray(record.orders) && record.lastUpdated > state.lastUpdated) {
+        state.orders = migrateOrders(record.orders);
+        if (record.users && typeof record.users === 'object') state.users = migrateUsers(record.users);
+        state.lastUpdated = record.lastUpdated;
+        state.updatedBy = record.updatedBy || '';
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+        renderAll();
+        updateSyncStatus('online', '已同步 · ' + (state.updatedBy || ''));
+        setJsonbinSyncInfo('拉取成功 · ' + new Date().toLocaleTimeString());
+      }
+    } catch (e) {}
+  }
+  function startJsonbinPolling() {
+    stopJsonbinPolling();
+    if (!jsonbinApiKey || !jsonbinBinId) return;
+    pollTimer = setInterval(jsonbinPull, POLL_INTERVAL);
+    setTimeout(jsonbinPull, 1000);
+  }
+  function stopJsonbinPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+  async function createJsonbinBin() {
+    const res = await fetch(JSONBIN_API + '/b', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Master-Key': jsonbinApiKey, 'X-Bin-Name': 'order_system_data', 'X-Bin-Private': 'true' }, body: JSON.stringify(state) });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || '创建失败（HTTP ' + res.status + '）'); }
+    const data = await res.json();
+    return data.metadata.id;
+  }
+  async function connectJsonbin() {
+    const key = els.jsonbinApiKey.value.trim();
+    let binId = els.jsonbinBinId.value.trim();
+    if (!key) { showToast('请输入 JSONBin Master Key', 'error'); return; }
+    jsonbinApiKey = key; jsonbinBinId = binId;
+    updateSyncStatus('syncing', '连接中...'); setJsonbinSyncInfo('正在验证 API Key...');
+    try {
+      if (!binId) {
+        setJsonbinSyncInfo('正在创建数据仓...');
+        binId = await createJsonbinBin(); jsonbinBinId = binId;
+      } else {
+        const res = await fetch(JSONBIN_API + '/b/' + binId + '/latest', { headers: { 'X-Master-Key': key, 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error('Bin ID 无效（HTTP ' + res.status + '）');
+        const data = await res.json();
+        const record = data.record || data;
+        if (record && Array.isArray(record.orders)) {
+          if (record.lastUpdated > state.lastUpdated) {
+            state.orders = migrateOrders(record.orders);
+            if (record.users && typeof record.users === 'object') state.users = migrateUsers(record.users);
+            state.lastUpdated = record.lastUpdated; state.updatedBy = record.updatedBy || '';
+          } else await jsonbinPush();
+        }
+      }
+      localStorage.setItem(JSONBIN_KEY, jsonbinApiKey);
+      localStorage.setItem(JSONBIN_BIN, jsonbinBinId);
+      updateSyncStatus('online', 'JSONBin 已连接');
+      setJsonbinSyncInfo('已连接 · Bin: ' + jsonbinBinId.slice(0, 8) + '...');
+      showToast('JSONBin 连接成功！');
+      renderJsonbinSettings(); renderAll(); startJsonbinPolling();
+    } catch (e) {
+      jsonbinApiKey = ''; jsonbinBinId = '';
+      localStorage.removeItem(JSONBIN_KEY); localStorage.removeItem(JSONBIN_BIN);
+      updateSyncStatus('error', '连接失败'); setJsonbinSyncInfo('连接失败：' + e.message);
+      showToast('连接失败：' + e.message, 'error');
+    }
+  }
+  function disconnectJsonbin() {
+    if (!confirm('断开 JSONBin 连接后将回到本地模式。确定断开吗？')) return;
+    jsonbinApiKey = ''; jsonbinBinId = '';
+    localStorage.removeItem(JSONBIN_KEY); localStorage.removeItem(JSONBIN_BIN);
+    stopJsonbinPolling();
+    updateSyncStatus('', '本地模式'); setJsonbinSyncInfo('');
+    renderJsonbinSettings();
+    showToast('已断开 JSONBin 连接');
+  }
+  function renderJsonbinSettings() {
+    if (jsonbinApiKey && jsonbinBinId) {
+      els.jsonbinShareWrap.classList.remove('hidden');
+      els.disconnectWrap.style.display = 'flex';
+      els.connectJsonbinBtn.textContent = '🔄 重新连接';
+      els.jsonbinShareInfo.textContent = 'Master Key：' + jsonbinApiKey + '\nBin ID：' + jsonbinBinId;
+    } else {
+      els.jsonbinShareWrap.classList.add('hidden');
+      els.disconnectWrap.style.display = 'none';
+      els.connectJsonbinBtn.textContent = '🔗 连接 JSONBin';
+    }
+  }
+
+  /* ==================== 权限 UI ==================== */
+  function updatePermissionUI() {
+    const scope = getCurrentViewScope();
+    let hint = '', hintClass = 'permission-hint';
+    if (scope.type === 'all' && (!scope.excluded || scope.excluded.length === 0)) {
+      hint = '👑 <strong>超级管理员</strong>：可查看、编辑、删除、统计<strong>所有业务员</strong>（含 cookie）的订单数据，并可管理角色与账号。';
+      hintClass = 'permission-hint super';
+    } else if (scope.type === 'all') {
+      const excl = scope.excluded.join('、');
+      hint = '👑 <strong>管理员</strong>：可查看、编辑、删除、统计订单数据，但<strong>不可查看「' + escapeHtml(excl) + '」的订单</strong>（统计中也不包含），可管理角色与账号。';
+    } else {
+      hint = '✏️ <strong>业务员</strong>：只能查看、编辑<strong>「' + escapeHtml(currentSalesperson) + '」</strong>本人的订单数据。';
+    }
+    els.permissionHint.innerHTML = hint;
+    els.permissionHint.className = hintClass;
+
+    let scopeText = '';
+    if (scope.type === 'all' && (!scope.excluded || scope.excluded.length === 0)) scopeText = '全部业务员（含 cookie）';
+    else if (scope.type === 'all') scopeText = '除 ' + scope.excluded.join('、') + ' 外全部';
+    else scopeText = '仅 ' + currentSalesperson;
+    els.scopeHint.textContent = scopeText;
+    els.spScopeHint.textContent = scopeText;
+
+    // 时间统计卡片可见性
+    if (currentRole === 'admin') {
+      els.timeStatsCard.style.display = 'block';
+      els.exportTimeReportItem.style.display = 'flex';
+    } else {
+      els.timeStatsCard.style.display = 'none';
+      els.exportTimeReportItem.style.display = 'none';
+    }
+
+    renderSalespersonFilter();
+    renderSalespersonOptions();
+  }
+
+  function renderSalespersonOptions() {
+    const select = els.salesperson;
+    if (!select) return;
+    const visible = getVisibleSalespersons();
+    if (currentRole === 'admin') {
+      select.innerHTML = visible.map(n => '<option value="' + escapeAttr(n) + '">' + escapeHtml(n) + '</option>').join('');
+      select.disabled = false;
+      const cur = select.value;
+      if (visible.includes(cur)) select.value = cur;
+      else if (visible.length > 0) select.value = visible[0];
+    } else {
+      if (currentSalesperson) {
+        select.innerHTML = '<option value="' + escapeAttr(currentSalesperson) + '">' + escapeHtml(currentSalesperson) + '</option>';
+        select.value = currentSalesperson;
+      }
+      select.disabled = true;
+    }
+  }
+
+  /* ==================== 文件预览 ==================== */
+  function renderFileListPreview(container, fileList) {
+    if (!container) return;
+    if (!fileList || fileList.length === 0) { container.innerHTML = ''; return; }
+    container.innerHTML = fileList.map(f => {
+      const sizeStr = f.fileSize ? ' (' + formatFileSize(f.fileSize) + ')' : '';
+      return '<span class="file-chip" title="' + escapeAttr(f.fileName) + '">📎 <span class="fname">' + escapeHtml(f.fileName) + '</span>' + sizeStr + '</span>';
+    }).join('');
+  }
+  function renderExistingReceiptsPreview(container, receipts) {
+    if (!container) return;
+    if (!receipts || receipts.length === 0) { container.innerHTML = '<span style="font-size:12px; color:var(--text-muted);">（暂无水单）</span>'; return; }
+    container.innerHTML = receipts.map(r => '<span class="file-chip" title="' + escapeAttr(r.fileName) + '">📎 <span class="fname">' + escapeHtml(r.fileName) + '</span>（已有）</span>').join('');
+  }
+
+  /* ==================== 车型行 ==================== */
+  function createModelRow(defaults = {}) {
+    modelRowCounter++;
+    const row = document.createElement('div');
+    row.className = 'model-row';
+    const carModel = defaults.carModel || '', quantity = defaults.quantity != null ? defaults.quantity : 1, color = defaults.color || '', fobPrice = defaults.fobPrice != null ? defaults.fobPrice : '0.00';
+    row.innerHTML = '<div class="model-row-header"><span>🚗 车型 <span class="row-number"></span></span><button type="button" class="remove-row-btn" title="删除此车型">✕</button></div><div class="model-row-grid"><div class="form-field"><label>车型 <span style="color:#dc2626;">*</span></label><input type="text" class="model-car" placeholder="如 Model Y" maxlength="40" value="' + escapeAttr(carModel) + '" required></div><div class="form-field"><label>数量 <span style="color:#dc2626;">*</span></label><input type="number" class="model-qty" min="1" step="1" value="' + escapeAttr(quantity) + '" required></div><div class="form-field"><label>颜色 <span style="color:#dc2626;">*</span></label><input type="text" class="model-color" placeholder="白色" maxlength="20" value="' + escapeAttr(color) + '" required></div><div class="form-field"><label>FOB价格 <span style="color:#dc2626;">*</span></label><input type="number" class="model-fob" min="0" step="0.01" value="' + escapeAttr(fobPrice) + '" required></div><div class="form-field"><label>总价</label><input type="text" class="model-total" readonly value="0.00"></div></div>';
+    const qtyInput = row.querySelector('.model-qty'), fobInput = row.querySelector('.model-fob'), totalInput = row.querySelector('.model-total'), removeBtn = row.querySelector('.remove-row-btn');
+    function calcRowTotal() { const qty = parseFloat(qtyInput.value) || 0, fob = parseFloat(fobInput.value) || 0; totalInput.value = (qty * fob).toFixed(2); updateOrderSummary(); }
+    qtyInput.addEventListener('input', calcRowTotal); fobInput.addEventListener('input', calcRowTotal); calcRowTotal();
+    removeBtn.addEventListener('click', () => { if (els.modelRowsContainer.children.length <= 1) { showToast('至少保留一个车型', 'error'); return; } row.remove(); updateModelRowNumbers(); updateOrderSummary(); });
+    return row;
+  }
+  function updateModelRowNumbers() {
+    const container = els.modelRowsContainer, rows = Array.from(container.children);
+    rows.forEach((row, idx) => { const numEl = row.querySelector('.row-number'); if (numEl) numEl.textContent = '#' + (idx + 1); });
+    const removeButtons = container.querySelectorAll('.remove-row-btn');
+    const onlyOne = removeButtons.length <= 1;
+    removeButtons.forEach(btn => { btn.disabled = onlyOne; });
+    if (els.modelCountBadge) els.modelCountBadge.textContent = rows.length;
+  }
+  function addModelRow(defaults = {}) { const row = createModelRow(defaults); els.modelRowsContainer.appendChild(row); updateModelRowNumbers(); return row; }
+
+  /* ==================== 收款行 ==================== */
+  function createPaymentRow(defaults = {}) {
+    paymentRowCounter++;
+    const row = document.createElement('div');
+    row.className = 'payment-row';
+    const date = defaults.date || todayStr(), amount = defaults.amount != null ? defaults.amount : '';
+    row.innerHTML = '<div class="payment-row-header"><span>💰 收款 <span class="row-number"></span></span><button type="button" class="remove-row-btn" title="删除此收款">✕</button></div><div class="payment-row-grid"><div class="form-field"><label>收款日期</label><input type="date" class="payment-date" value="' + escapeAttr(date) + '"></div><div class="form-field"><label>收款金额 (USD)</label><input type="number" class="payment-amount" min="0" step="0.01" value="' + escapeAttr(amount) + '" placeholder="0.00"></div></div>';
+    const amountInput = row.querySelector('.payment-amount'), removeBtn = row.querySelector('.remove-row-btn');
+    amountInput.addEventListener('input', updateOrderSummary);
+    removeBtn.addEventListener('click', () => { row.remove(); updatePaymentRowNumbers(); updateOrderSummary(); });
+    return row;
+  }
+  function updatePaymentRowNumbers() {
+    const container = els.paymentRowsContainer, rows = Array.from(container.children);
+    rows.forEach((row, idx) => { const numEl = row.querySelector('.row-number'); if (numEl) numEl.textContent = '#' + (idx + 1); });
+    if (els.paymentCountBadge) els.paymentCountBadge.textContent = rows.length;
+    if (rows.length === 0) { els.paymentHint.style.display = 'block'; els.paymentHint.textContent = '尚未录入收款记录'; }
+    else els.paymentHint.style.display = 'none';
+  }
+  function addPaymentRow(defaults = {}) { const row = createPaymentRow(defaults); els.paymentRowsContainer.appendChild(row); updatePaymentRowNumbers(); updateOrderSummary(); return row; }
+
+  /* ==================== 汇总 ==================== */
+  function updateOrderSummary() {
+    let orderTotal = 0;
+    els.modelRowsContainer.querySelectorAll('.model-row').forEach(row => { orderTotal += parseFloat(row.querySelector('.model-total').value) || 0; });
+    let received = 0;
+    els.paymentRowsContainer.querySelectorAll('.payment-row').forEach(row => { received += parseFloat(row.querySelector('.payment-amount').value) || 0; });
+    const outstanding = orderTotal - received;
+    els.summaryOrderTotal.textContent = '$' + formatMoney(orderTotal);
+    els.summaryReceived.textContent = '$' + formatMoney(received);
+    els.summaryOutstanding.textContent = '$' + formatMoney(outstanding);
+    if (outstanding <= 0.01) els.summaryOutstandingWrap.classList.add('zero');
+    else els.summaryOutstandingWrap.classList.remove('zero');
+  }
+
+  /* ==================== 编辑车型行 ==================== */
+  function createEditModelRow(defaults = {}) {
+    editModelRowCounter++;
+    const row = document.createElement('div');
+    row.className = 'model-row';
+    const carModel = defaults.carModel || '', quantity = defaults.quantity != null ? defaults.quantity : 1, color = defaults.color || '', fobPrice = defaults.fobPrice != null ? defaults.fobPrice : '0.00';
+    row.innerHTML = '<div class="model-row-header"><span>🚗 车型 <span class="row-number"></span></span><button type="button" class="remove-row-btn" title="删除此车型">✕</button></div><div class="model-row-grid"><div class="form-field"><label>车型 <span style="color:#dc2626;">*</span></label><input type="text" class="model-car" maxlength="40" value="' + escapeAttr(carModel) + '"></div><div class="form-field"><label>数量 <span style="color:#dc2626;">*</span></label><input type="number" class="model-qty" min="1" step="1" value="' + escapeAttr(quantity) + '"></div><div class="form-field"><label>颜色 <span style="color:#dc2626;">*</span></label><input type="text" class="model-color" maxlength="20" value="' + escapeAttr(color) + '"></div><div class="form-field"><label>FOB价格 <span style="color:#dc2626;">*</span></label><input type="number" class="model-fob" min="0" step="0.01" value="' + escapeAttr(fobPrice) + '"></div><div class="form-field"><label>总价</label><input type="text" class="model-total" readonly value="0.00"></div></div>';
+    const qtyInput = row.querySelector('.model-qty'), fobInput = row.querySelector('.model-fob'), totalInput = row.querySelector('.model-total'), removeBtn = row.querySelector('.remove-row-btn');
+    function calcRowTotal() { const qty = parseFloat(qtyInput.value) || 0, fob = parseFloat(fobInput.value) || 0; totalInput.value = (qty * fob).toFixed(2); updateEditSummary(); }
+    qtyInput.addEventListener('input', calcRowTotal); fobInput.addEventListener('input', calcRowTotal); calcRowTotal();
+    removeBtn.addEventListener('click', () => { if (els.editModelRowsContainer.children.length <= 1) { showToast('至少保留一个车型', 'error'); return; } row.remove(); updateEditModelRowNumbers(); updateEditSummary(); });
+    return row;
+  }
+  function updateEditModelRowNumbers() {
+    const container = els.editModelRowsContainer, rows = Array.from(container.children);
+    rows.forEach((row, idx) => { const numEl = row.querySelector('.row-number'); if (numEl) numEl.textContent = '#' + (idx + 1); });
+    const removeButtons = container.querySelectorAll('.remove-row-btn');
+    const onlyOne = removeButtons.length <= 1;
+    removeButtons.forEach(btn => { btn.disabled = onlyOne; });
+    if (els.editModelCountBadge) els.editModelCountBadge.textContent = rows.length;
+  }
+  function addEditModelRow(defaults = {}) { const row = createEditModelRow(defaults); els.editModelRowsContainer.appendChild(row); updateEditModelRowNumbers(); return row; }
+
+  /* ==================== 编辑收款行 ==================== */
+  function createEditPaymentRow(defaults = {}) {
+    editPaymentRowCounter++;
+    const row = document.createElement('div');
+    row.className = 'payment-row';
+    const date = defaults.date || todayStr(), amount = defaults.amount != null ? defaults.amount : '';
+    row.innerHTML = '<div class="payment-row-header"><span>💰 收款 <span class="row-number"></span></span><button type="button" class="remove-row-btn" title="删除此收款">✕</button></div><div class="payment-row-grid"><div class="form-field"><label>收款日期</label><input type="date" class="payment-date" value="' + escapeAttr(date) + '"></div><div class="form-field"><label>收款金额 (USD)</label><input type="number" class="payment-amount" min="0" step="0.01" value="' + escapeAttr(amount) + '"></div></div>';
+    const amountInput = row.querySelector('.payment-amount'), removeBtn = row.querySelector('.remove-row-btn');
+    amountInput.addEventListener('input', updateEditSummary);
+    removeBtn.addEventListener('click', () => { row.remove(); updateEditPaymentRowNumbers(); updateEditSummary(); });
+    return row;
+  }
+  function updateEditPaymentRowNumbers() {
+    const container = els.editPaymentRowsContainer, rows = Array.from(container.children);
+    rows.forEach((row, idx) => { const numEl = row.querySelector('.row-number'); if (numEl) numEl.textContent = '#' + (idx + 1); });
+    if (els.editPaymentCountBadge) els.editPaymentCountBadge.textContent = rows.length;
+  }
+  function addEditPaymentRow(defaults = {}) { const row = createEditPaymentRow(defaults); els.editPaymentRowsContainer.appendChild(row); updateEditPaymentRowNumbers(); updateEditSummary(); return row; }
+
+  /* ==================== 编辑汇总 ==================== */
+  function updateEditSummary() {
+    let orderTotal = 0;
+    els.editModelRowsContainer.querySelectorAll('.model-row').forEach(row => { orderTotal += parseFloat(row.querySelector('.model-total').value) || 0; });
+    let received = 0;
+    els.editPaymentRowsContainer.querySelectorAll('.payment-row').forEach(row => { received += parseFloat(row.querySelector('.payment-amount').value) || 0; });
+    const outstanding = orderTotal - received;
+    els.editSummaryOrderTotal.textContent = '$' + formatMoney(orderTotal);
+    els.editSummaryReceived.textContent = '$' + formatMoney(received);
+    els.editSummaryOutstanding.textContent = '$' + formatMoney(outstanding);
+    if (outstanding <= 0.01) els.editSummaryOutstandingWrap.classList.add('zero');
+    else els.editSummaryOutstandingWrap.classList.remove('zero');
+  }
+
+  /* ==================== 打开编辑 ==================== */
+  function openEditOrder(orderNo) {
+    const records = state.orders.filter(o => o.orderNo === orderNo);
+    if (records.length === 0) { showToast('未找到该订单', 'error'); return; }
+    const first = records[0];
+    if (!canEditOrder(first)) { showToast('无权编辑此订单', 'error'); return; }
+    editContext.originalOrderNo = orderNo;
+    editContext.originalSalesperson = first.salesperson;
+    editContext.originalReceipts = getReceiptsFromRecords(records).slice();
+    els.editOrderNo.value = orderNo;
+    els.editSalesperson.value = first.salesperson;
+    els.editOrderDate.value = first.orderDate;
+    els.editCustomerName.value = first.customerName || '';
+    els.editReceiptFile.value = '';
+    renderExistingReceiptsPreview(els.editFileNameDisplay, editContext.originalReceipts);
+    els.editModelRowsContainer.innerHTML = '';
+    editModelRowCounter = 0;
+    records.forEach(r => addEditModelRow({ carModel: r.carModel, quantity: r.quantity, color: r.color, fobPrice: r.fobPrice }));
+    els.editPaymentRowsContainer.innerHTML = '';
+    editPaymentRowCounter = 0;
+    getPaymentsFromRecords(records).forEach(p => addEditPaymentRow(p));
+    updateEditSummary();
+    openModal('editOrderModal');
+  }
+
+  /* ==================== 保存编辑 ==================== */
+  async function saveEditOrder() {
+    const orderNo = editContext.originalOrderNo;
+    if (!orderNo) { showToast('编辑上下文丢失', 'error'); return; }
+    const orderDate = els.editOrderDate.value;
+    const customerName = els.editCustomerName.value.trim();
+    if (!orderDate || !customerName) { showToast('请完整填写订单时间和客户名称', 'error'); return; }
+    const modelRows = els.editModelRowsContainer.querySelectorAll('.model-row');
+    const models = [];
+    for (const row of modelRows) {
+      const carModel = row.querySelector('.model-car').value.trim();
+      const quantity = parseInt(row.querySelector('.model-qty').value, 10);
+      const color = row.querySelector('.model-color').value.trim();
+      const fobPrice = parseFloat(row.querySelector('.model-fob').value);
+      if (!carModel || !quantity || quantity < 1 || !color || isNaN(fobPrice) || fobPrice < 0) { showToast('请完整填写所有车型信息', 'error'); return; }
+      models.push({ carModel, quantity, color, fobPrice, totalPrice: +(quantity * fobPrice).toFixed(2) });
+    }
+    if (models.length === 0) { showToast('请至少填写一个车型', 'error'); return; }
+    const paymentRows = els.editPaymentRowsContainer.querySelectorAll('.payment-row');
+    const payments = [];
+    for (const row of paymentRows) {
+      const date = row.querySelector('.payment-date').value;
+      const amount = parseFloat(row.querySelector('.payment-amount').value);
+      if (!date || isNaN(amount) || amount <= 0) { showToast('请填写完整的收款信息（日期和金额）', 'error'); return; }
+      payments.push({ date, amount: +amount.toFixed(2) });
+    }
+    const orderTotal = models.reduce((s, m) => s + m.totalPrice, 0);
+    const receivedTotal = payments.reduce((s, p) => s + p.amount, 0);
+    let paymentStatus = '未收款';
+    if (receivedTotal > 0) { if (receivedTotal >= orderTotal - 0.01) paymentStatus = '已收款'; else paymentStatus = '部分收款'; }
+    const newFiles = Array.from(els.editReceiptFile.files || []);
+    let receipts = [];
+    if (newFiles.length > 0) {
+      const read = await readFilesAsDataURLs(newFiles, MAX_FILE_SIZE);
+      receipts = read.map(r => ({ fileName: r.fileName, fileType: r.fileType, fileData: r.fileData }));
+    } else receipts = editContext.originalReceipts.slice();
+    state.orders = state.orders.filter(o => o.orderNo !== orderNo);
+    const batchCreatedAt = Date.now();
+    const salesperson = editContext.originalSalesperson;
+    const newOrders = models.map((m, idx) => ({
+      id: generateId(), orderNo, salesperson, orderDate, customerName,
+      carModel: m.carModel, quantity: m.quantity, color: m.color, fobPrice: m.fobPrice, totalPrice: m.totalPrice,
+      paymentStatus, payments: payments.slice(), receipts: receipts.slice(),
+      createdAt: batchCreatedAt + idx, createdBy: currentUser.username
+    }));
+    state.orders.push(...newOrders);
+    saveToStorage(true, true);
+    renderAll();
+    closeModal('editOrderModal');
+    showToast('订单「' + orderNo + '」已更新');
+  }
+
+  /* ==================== 表单 ==================== */
+  function bindForm() {
+    els.receiptFile.addEventListener('change', function() {
+      const files = Array.from(this.files || []);
+      const preview = files.map(f => ({ fileName: f.name, fileSize: f.size }));
+      renderFileListPreview(els.fileNameDisplay, preview);
+      if (files.length > 0) {
+        const bigFiles = files.filter(f => f.size > MAX_FILE_SIZE);
+        if (bigFiles.length > 0) showToast('有 ' + bigFiles.length + ' 个文件超过 500KB，仅保存文件名', 'error');
+      }
+    });
+    els.addModelBtn.addEventListener('click', () => {
+      addModelRow();
+      const lastRow = els.modelRowsContainer.lastElementChild;
+      if (lastRow) { lastRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); const carInput = lastRow.querySelector('.model-car'); if (carInput) setTimeout(() => carInput.focus(), 100); }
+    });
+    els.addPaymentBtn.addEventListener('click', () => {
+      addPaymentRow();
+      const lastRow = els.paymentRowsContainer.lastElementChild;
+      if (lastRow) { lastRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); const amtInput = lastRow.querySelector('.payment-amount'); if (amtInput) setTimeout(() => amtInput.focus(), 100); }
+    });
+    els.orderForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      if (!currentUser) { showToast('请先登录', 'error'); return; }
+      const salesperson = els.salesperson.value;
+      if (!salesperson) { showToast('请选择业务员', 'error'); return; }
+      if (currentRole === 'admin') {
+        if (!getVisibleSalespersons().includes(salesperson)) { showToast('无权为该业务员录入订单', 'error'); return; }
+      } else if (salesperson !== currentSalesperson) { showToast('只能为自己录入订单', 'error'); return; }
+      const orderNo = els.orderNo.value.trim();
+      const orderDate = els.orderDate.value;
+      const customerName = els.customerName.value.trim();
+      if (!orderNo || !orderDate || !customerName) { showToast('请完整填写订单基本信息', 'error'); return; }
+      const modelRows = els.modelRowsContainer.querySelectorAll('.model-row');
+      const models = [];
+      for (const row of modelRows) {
+        const carModel = row.querySelector('.model-car').value.trim();
+        const quantity = parseInt(row.querySelector('.model-qty').value, 10);
+        const color = row.querySelector('.model-color').value.trim();
+        const fobPrice = parseFloat(row.querySelector('.model-fob').value);
+        if (!carModel || !quantity || quantity < 1 || !color || isNaN(fobPrice) || fobPrice < 0) { showToast('请完整填写所有车型信息', 'error'); return; }
+        models.push({ carModel, quantity, color, fobPrice, totalPrice: +(quantity * fobPrice).toFixed(2) });
+      }
+      if (models.length === 0) { showToast('请至少填写一个车型', 'error'); return; }
+      const paymentRows = els.paymentRowsContainer.querySelectorAll('.payment-row');
+      const payments = [];
+      for (const row of paymentRows) {
+        const date = row.querySelector('.payment-date').value;
+        const amount = parseFloat(row.querySelector('.payment-amount').value);
+        if (!date || isNaN(amount) || amount <= 0) { showToast('请填写完整的收款信息（日期和金额）', 'error'); return; }
+        payments.push({ date, amount: +amount.toFixed(2) });
+      }
+      const orderTotal = models.reduce((s, m) => s + m.totalPrice, 0);
+      const receivedTotal = payments.reduce((s, p) => s + p.amount, 0);
+      let paymentStatus = '未收款';
+      if (receivedTotal > 0) { if (receivedTotal >= orderTotal - 0.01) paymentStatus = '已收款'; else paymentStatus = '部分收款'; }
+      const files = Array.from(els.receiptFile.files || []);
+      let receipts = [];
+      if (files.length > 0) {
+        const read = await readFilesAsDataURLs(files, MAX_FILE_SIZE);
+        receipts = read.map(r => ({ fileName: r.fileName, fileType: r.fileType, fileData: r.fileData }));
+      }
+      const batchCreatedAt = Date.now();
+      const newOrders = models.map((m, idx) => ({
+        id: generateId(), orderNo, salesperson, orderDate, customerName,
+        carModel: m.carModel, quantity: m.quantity, color: m.color, fobPrice: m.fobPrice, totalPrice: m.totalPrice,
+        paymentStatus, payments: payments.slice(), receipts: receipts.slice(),
+        createdAt: batchCreatedAt + idx, createdBy: currentUser.username
+      }));
+      state.orders.push(...newOrders);
+      saveToStorage(true, true);
+      renderAll();
+      clearOrderForm();
+      const totalCount = models.reduce((s, m) => s + m.quantity, 0);
+      showToast('订单已添加：' + models.length + ' 个车型 · ' + payments.length + ' 笔收款 · ' + receipts.length + ' 个水单 · 共 ' + totalCount + ' 台' + (jsonbinBinId ? '，已同步' : ''));
+    });
+  }
+
+  /* ==================== 清空表单 ==================== */
+  function clearOrderForm() {
+    els.orderNo.value = '';
+    els.orderDate.value = todayStr();
+    els.customerName.value = '';
+    els.receiptFile.value = '';
+    els.fileNameDisplay.innerHTML = '';
+    els.modelRowsContainer.innerHTML = '';
+    modelRowCounter = 0;
+    addModelRow();
+    els.paymentRowsContainer.innerHTML = '';
+    paymentRowCounter = 0;
+    updatePaymentRowNumbers();
+    renderSalespersonOptions();
+    updateOrderSummary();
+  }
+  function resetForm() { clearOrderForm(); }
+
+  /* ==================== 删除 & 查看 ==================== */
+  function deleteOrder(id) {
+    const order = state.orders.find(o => o.id === id);
+    if (!order) return;
+    if (!canViewOrder(order)) { showToast('无权操作该订单', 'error'); return; }
+    if (currentRole !== 'admin' && order.salesperson !== currentSalesperson) { showToast('无权删除他人订单', 'error'); return; }
+    if (!confirm('确定删除【' + order.orderNo + ' · ' + order.carModel + '】这条车型记录吗？')) return;
+    state.orders = state.orders.filter(o => o.id !== id);
+    saveToStorage(true, true);
+    renderAll();
+    showToast('记录已删除');
+  }
+
+  function viewReceipts(id) {
+    const order = state.orders.find(o => o.id === id);
+    if (!order) { showToast('记录不存在'); return; }
+    if (!canViewOrder(order)) { showToast('无权查看该订单', 'error'); return; }
+    const records = state.orders.filter(o => o.orderNo === order.orderNo);
+    let receipts = getReceiptsFromRecords(records);
+    if (receipts.length === 0) { showToast('该订单无水单文件'); return; }
+    const win = window.open();
+    if (!win) { showToast('请允许浏览器弹出窗口', 'error'); return; }
+    let html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + escapeHtml(order.orderNo) + ' · 水单</title>';
+    html += '<style>body{margin:0;background:#0f1924;color:#e0e8f0;font-family:"Microsoft YaHei",Arial,sans-serif;padding:20px;}h1{font-size:18px;color:#7dd3fc;margin:0 0 6px;}.sub{font-size:12px;color:#94a3b8;margin-bottom:20px;}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}.card{background:#1e293b;border-radius:10px;overflow:hidden;border:1px solid #334155;display:flex;flex-direction:column;}.card-head{padding:8px 12px;font-size:12px;color:#94a3b8;background:#0f172a;border-bottom:1px solid #334155;display:flex;justify-content:space-between;align-items:center;gap:8px;}.card-head .fname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:#e0e8f0;}.card-head .idx{background:#334155;color:#cbd5e1;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:700;}.card-body{padding:10px;display:flex;align-items:center;justify-content:center;flex:1;min-height:160px;}.card-body img{max-width:100%;max-height:70vh;border-radius:6px;cursor:zoom-in;}.card-body .file-info{text-align:center;color:#94a3b8;font-size:12px;}.card-foot{padding:8px 12px;background:#0f172a;border-top:1px solid #334155;display:flex;justify-content:space-between;align-items:center;}.card-foot a{color:#7dd3fc;text-decoration:none;font-size:12px;font-weight:600;padding:4px 10px;border:1px solid #3b82f6;border-radius:14px;transition:0.15s;}.card-foot a:hover{background:#3b82f6;color:white;}.zoom-hint{position:fixed;bottom:16px;right:16px;background:#1e293b;color:#94a3b8;padding:6px 14px;border-radius:20px;font-size:12px;border:1px solid #334155;}</style></head><body>';
+    html += '<h1>📎 ' + escapeHtml(order.orderNo) + ' · 客户水单</h1>';
+    html += '<div class="sub">共 ' + receipts.length + ' 个文件 · 客户：' + escapeHtml(order.customerName || '—') + '</div>';
+    html += '<div class="grid">';
+    receipts.forEach((r, idx) => {
+      const isImage = (r.fileType || '').startsWith('image/') || /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(r.fileName || '');
+      html += '<div class="card">';
+      html += '<div class="card-head"><span class="fname" title="' + escapeAttr(r.fileName) + '">' + escapeHtml(r.fileName) + '</span><span class="idx">#' + (idx + 1) + '</span></div>';
+      html += '<div class="card-body">';
+      if (r.fileData && isImage) html += '<img src="' + r.fileData + '" alt="' + escapeAttr(r.fileName) + '">';
+      else if (r.fileData) html += '<div class="file-info">📄 此文件非图片类型<br>点击下方按钮下载查看</div>';
+      else html += '<div class="file-info">📄 ' + (r.fileSize ? formatFileSize(r.fileSize) + '（大文件未保存内容）' : '文件内容未保存') + '<br>仅记录文件名</div>';
+      html += '</div>';
+      html += '<div class="card-foot"><span style="color:#64748b;font-size:11px;">' + (isImage ? '图片' : '文件') + '</span>';
+      if (r.fileData) html += '<a href="' + r.fileData + '" download="' + escapeAttr(r.fileName) + '">⬇ 下载</a>';
+      else html += '<span style="color:#64748b;font-size:11px;">（无法下载）</span>';
+      html += '</div></div>';
+    });
+    html += '</div><div class="zoom-hint">💡 点击图片可放大</div></body></html>';
+    win.document.write(html);
+    win.document.close();
+  }
+
+  /* ==================== 筛选 ==================== */
+  function bindFilters() {
+    [els.filterStartDate, els.filterEndDate, els.filterSalesperson, els.filterCustomer, els.filterModel, els.filterOrderNo].forEach(el => {
+      el.addEventListener('input', renderAll);
+      el.addEventListener('change', renderAll);
+    });
+    els.resetFilterBtn.addEventListener('click', function() {
+      els.filterStartDate.value = ''; els.filterEndDate.value = '';
+      if (currentRole === 'admin') els.filterSalesperson.value = '';
+      els.filterCustomer.value = ''; els.filterModel.value = ''; els.filterOrderNo.value = '';
+      renderAll();
+    });
+  }
+  function renderSalespersonFilter() {
+    const visible = getVisibleSalespersons();
+    if (currentRole !== 'admin') {
+      if (currentSalesperson) {
+        els.filterSalesperson.innerHTML = '<option value="' + escapeAttr(currentSalesperson) + '">' + escapeHtml(currentSalesperson) + '（本人）</option>';
+        els.filterSalesperson.value = currentSalesperson;
+      }
+      if (els.advSalesperson) {
+        els.advSalesperson.innerHTML = '<option value="' + escapeAttr(currentSalesperson) + '">' + escapeHtml(currentSalesperson) + '（本人）</option>';
+        els.advSalesperson.value = currentSalesperson;
+      }
+      return;
+    }
+    const currentVal = els.filterSalesperson.value;
+    els.filterSalesperson.innerHTML = '<option value="">全部可见业务员</option>' + visible.map(n => '<option value="' + escapeAttr(n) + '">' + escapeHtml(n) + '</option>').join('');
+    if (visible.includes(currentVal)) els.filterSalesperson.value = currentVal;
+    if (els.advSalesperson) {
+      const advVal = els.advSalesperson.value;
+      els.advSalesperson.innerHTML = '<option value="">全部可见业务员</option>' + visible.map(n => '<option value="' + escapeAttr(n) + '">' + escapeHtml(n) + '</option>').join('');
+      if (visible.includes(advVal)) els.advSalesperson.value = advVal;
+    }
+  }
+
+  /* ==================== 统计 ==================== */
+  function renderStats() {
+    const filtered = getFilteredOrders();
+    const orderNoSet = new Set(filtered.map(o => o.orderNo).filter(Boolean));
+    const totalQuantity = filtered.reduce((s, o) => s + (Number(o.quantity) || 0), 0);
+    const totalAmount = filtered.reduce((s, o) => s + (Number(o.totalPrice) || 0), 0);
+    const seenOrderNos = new Set();
+    let totalReceived = 0;
+    filtered.forEach(o => {
+      if (seenOrderNos.has(o.orderNo)) return;
+      seenOrderNos.add(o.orderNo);
+      totalReceived += sumPayments(o.payments);
+    });
+    const totalOutstanding = totalAmount - totalReceived;
+    els.statTotalOrders.textContent = orderNoSet.size;
+    els.statTotalRecords.textContent = filtered.length;
+    els.statTotalAmount.textContent = formatMoney(totalAmount);
+    els.statTotalReceived.textContent = formatMoney(totalReceived);
+    els.statTotalOutstanding.textContent = formatMoney(totalOutstanding);
+    if (totalOutstanding <= 0.01) els.statOutstandingCard.classList.add('zero');
+    else els.statOutstandingCard.classList.remove('zero');
+  }
+  function renderSalespersonStats() {
+    const filtered = getFilteredOrders();
+    const map = new Map();
+    filtered.forEach(o => {
+      const sp = o.salesperson || '未署名';
+      if (!map.has(sp)) map.set(sp, { count: 0, qty: 0, amount: 0, received: 0, orderNos: new Set() });
+      const item = map.get(sp);
+      const isNewOrder = !item.orderNos.has(o.orderNo);
+      item.orderNos.add(o.orderNo || '');
+      item.count = item.orderNos.size;
+      item.qty += Number(o.quantity) || 0;
+      item.amount += Number(o.totalPrice) || 0;
+      if (isNewOrder) item.received += sumPayments(o.payments);
+    });
+    const arr = [...map.entries()].sort((a, b) => b[1].amount - a[1].amount);
+    if (arr.length === 0) { els.salespersonStatsBody.innerHTML = ''; els.salespersonNoData.style.display = 'block'; return; }
+    els.salespersonNoData.style.display = 'none';
+    els.salespersonStatsBody.innerHTML = arr.map(([name, s]) => {
+      const isSelf = (name === currentSalesperson);
+      const selfTag = isSelf ? '<span style="background:#e3f6ea;color:#1e7a4c;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:6px;font-weight:700;">本人</span>' : '';
+      const outstanding = s.amount - s.received;
+      return '<tr>' +
+        '<td style="font-weight:600;color:var(--primary);">' + escapeHtml(name) + selfTag + '</td>' +
+        '<td class="num">' + s.count + '</td>' +
+        '<td class="num" style="font-weight:700;color:var(--primary-dark);">$' + formatMoney(s.amount) + '</td>' +
+        '<td class="num" style="font-weight:700;color:var(--paid);">$' + formatMoney(s.received) + '</td>' +
+        '<td class="num" style="font-weight:700;color:' + (outstanding > 0.01 ? 'var(--warning)' : 'var(--success)') + ';">$' + formatMoney(outstanding) + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  /* ==================== 订单分组 ==================== */
+  function renderOrderGroups() {
+    const filtered = getFilteredOrders().sort((a, b) => {
+      if (a.orderNo !== b.orderNo) return a.orderNo < b.orderNo ? 1 : -1;
+      return (a.createdAt || 0) - (b.createdAt || 0);
+    });
+    if (filtered.length === 0) {
+      els.orderGroupsContainer.innerHTML = '';
+      els.ordersNoData.classList.remove('hidden');
+      const scope = getCurrentViewScope();
+      if (scope.type === 'self') els.ordersNoData.innerHTML = '<span class="big">📭</span>您还没有订单数据';
+      else els.ordersNoData.innerHTML = '<span class="big">📭</span>暂无符合条件的订单';
+      return;
+    }
+    els.ordersNoData.classList.add('hidden');
+    const groups = {};
+    filtered.forEach(o => { const no = o.orderNo || '（无编号）'; if (!groups[no]) groups[no] = []; groups[no].push(o); });
+    const groupKeys = Object.keys(groups).sort((a, b) => {
+      const aDate = groups[a][0]?.orderDate || '', bDate = groups[b][0]?.orderDate || '';
+      if (aDate !== bDate) return aDate < bDate ? 1 : -1;
+      return a < b ? 1 : -1;
+    });
+    let scopeLabel = '';
+    const scope = getCurrentViewScope();
+    if (scope.type === 'all' && (!scope.excluded || scope.excluded.length === 0)) scopeLabel = '（全部业务员，含 cookie）';
+    else if (scope.type === 'all') scopeLabel = '（除 ' + scope.excluded.join('、') + ' 外）';
+    else scopeLabel = '（仅本人）';
+    els.orderCountHint.textContent = '共 ' + groupKeys.length + ' 个订单编号 · ' + filtered.length + ' 条车型记录' + scopeLabel;
+
+    let html = '';
+    groupKeys.forEach(orderNo => {
+      const records = groups[orderNo].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      const first = records[0];
+      const totalAmount = records.reduce((s, o) => s + (Number(o.totalPrice) || 0), 0);
+      const totalQty = records.reduce((s, o) => s + (Number(o.quantity) || 0), 0);
+      const carModels = records.map(o => o.carModel).filter(Boolean);
+      const isCollapsed = collapsedGroups[orderNo] === true;
+      const receipts = getReceiptsFromRecords(records);
+      const receiptCount = receipts.length;
+      const payments = getPaymentsFromRecords(records);
+      const totalReceived = sumPayments(payments);
+      const outstanding = totalAmount - totalReceived;
+      const canEdit = canEditOrder(first);
+
+      let receivedBadge = '';
+      if (totalReceived > 0.01) {
+        if (outstanding <= 0.01) receivedBadge = '<span class="received-badge">✅ 已收款 $' + formatMoney(totalReceived) + '</span>';
+        else receivedBadge = '<span class="received-badge partial">⏳ 已收 $' + formatMoney(totalReceived) + ' / $' + formatMoney(totalAmount) + '</span>';
+      }
+
+      html += '<div class="order-group' + (isCollapsed ? ' collapsed' : '') + '">';
+      html += '<div class="order-group-header" data-toggle="' + escapeAttr(orderNo) + '">';
+      html += '<div class="left"><span class="order-no">📋 ' + escapeHtml(orderNo) + '</span>';
+      html += '<span class="meta"><span>👤 <b>' + escapeHtml(first.salesperson || '未署名') + '</b></span><span>📅 ' + escapeHtml(first.orderDate) + '</span><span>🏢 ' + escapeHtml(first.customerName) + '</span>';
+      if (receiptCount > 0) html += '<span>📎 <b>' + receiptCount + '</b> 个水单</span>';
+      html += '</span></div>';
+      html += '<div class="right">';
+      html += receivedBadge;
+      html += '<span class="count-badge">' + records.length + ' 个车型 · ' + totalQty + ' 台</span>';
+      html += '<span class="total-badge">$' + formatMoney(totalAmount) + '</span>';
+      if (canEdit) html += '<button class="group-btn edit" data-edit-group="' + escapeAttr(orderNo) + '" title="编辑此订单">✏️ 编辑</button>';
+      html += '<button class="group-btn" data-download-group="' + escapeAttr(orderNo) + '" title="下载此订单编号明细">📥 下载</button>';
+      html += '<span class="toggle-arrow">▼</span></div></div>';
+
+      html += '<div class="order-group-body"><div class="table-wrapper" style="border:none;border-radius:0;"><table class="order-table"><thead><tr><th>#</th><th>车型</th><th class="num">数量</th><th>颜色</th><th class="num">FOB</th><th class="num">总价</th><th>水单</th><th>业务员</th><th></th></tr></thead><tbody>';
+      records.forEach((o, idx) => {
+        const canDelete = currentRole === 'admin' || o.salesperson === currentSalesperson;
+        const deleteBtn = canDelete ? '<button class="btn-sm danger" style="padding:4px 10px;font-size:11px;" data-del="' + o.id + '">删除</button>' : '';
+        let fileCell = '<span style="color:#b8cbd9;">—</span>';
+        if (receiptCount > 0) {
+          if (receiptCount === 1) {
+            const r0 = receipts[0];
+            const shortName = (r0.fileName || '').length > 10 ? r0.fileName.slice(0, 9) + '…' : r0.fileName;
+            fileCell = '<span class="file-badge" data-view="' + o.id + '" title="点击查看水单">📎 ' + escapeHtml(shortName) + '</span>';
+          } else {
+            fileCell = '<span class="file-badge multi" data-view="' + o.id + '" title="点击查看 ' + receiptCount + ' 个水单">📎 ' + receiptCount + ' 个水单</span>';
+          }
+        }
+        html += '<tr><td style="color:var(--text-muted);">' + (idx + 1) + '</td><td style="font-weight:600;">' + escapeHtml(o.carModel) + '</td><td class="num">' + o.quantity + '</td><td>' + escapeHtml(o.color) + '</td><td class="num">$' + formatMoney(o.fobPrice) + '</td><td class="num total-cell">$' + formatMoney(o.totalPrice) + '</td><td>' + fileCell + '</td><td style="font-size:12px;color:var(--text-muted);">' + escapeHtml(o.salesperson || '') + '</td><td>' + deleteBtn + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+
+      if (payments.length > 0) {
+        html += '<div class="payment-detail-section"><div class="pd-title">💰 收款明细 · 共 ' + payments.length + ' 笔</div><table class="payment-detail-table"><thead><tr><th>#</th><th>收款日期</th><th class="num">收款金额 (USD)</th></tr></thead><tbody>';
+        payments.forEach((p, i) => { html += '<tr><td style="color:var(--text-muted);">' + (i + 1) + '</td><td>' + escapeHtml(p.date || '—') + '</td><td class="num">$' + formatMoney(p.amount) + '</td></tr>'; });
+        html += '<tr style="background:#f5fbf7; font-weight:700;"><td colspan="2" style="text-align:right;">已收款合计</td><td class="num" style="color:var(--paid);">$' + formatMoney(totalReceived) + '</td></tr>';
+        if (outstanding > 0.01) html += '<tr style="background:#fffaf0; font-weight:700;"><td colspan="2" style="text-align:right;">未收款</td><td class="num" style="color:var(--warning);">$' + formatMoney(outstanding) + '</td></tr>';
+        html += '</tbody></table></div>';
+      }
+
+      html += '<div style="padding:8px 16px;background:#fafdff;border-top:1px solid #eef4f9;font-size:12.5px;color:var(--text-muted);display:flex;gap:20px;flex-wrap:wrap;">';
+      html += '<span>车型汇总：<b style="color:var(--primary-dark);">' + carModels.map(m => escapeHtml(m)).join('、') + '</b></span>';
+      html += '<span>总数量：<b style="color:var(--primary-dark);">' + totalQty + ' 台</b></span>';
+      html += '<span>订单总金额：<b style="color:var(--primary-dark);">$' + formatMoney(totalAmount) + '</b></span>';
+      html += '<span>已收款：<b style="color:var(--paid);">$' + formatMoney(totalReceived) + '</b></span>';
+      if (outstanding > 0.01) html += '<span>未收款：<b style="color:var(--warning);">$' + formatMoney(outstanding) + '</b></span>';
+      if (receiptCount > 0) html += '<span>水单：<b style="color:var(--primary-dark);">' + receiptCount + ' 个文件</b></span>';
+      html += '</div></div></div>';
+    });
+    els.orderGroupsContainer.innerHTML = html;
+  }
+
+  function renderAll() {
+    if (!currentUser) return;
+    updatePermissionUI();
+    renderStats();
+    renderTimeStats();
+    renderSalespersonStats();
+    renderOrderGroups();
+  }
+
+  /* ==================== 事件 ==================== */
+  function bindGroupEvents() {
+    els.orderGroupsContainer.addEventListener('click', function(e) {
+      const editBtn = e.target.closest('[data-edit-group]');
+      if (editBtn) { e.stopPropagation(); openEditOrder(editBtn.getAttribute('data-edit-group')); return; }
+      const downloadGroupBtn = e.target.closest('[data-download-group]');
+      if (downloadGroupBtn) { e.stopPropagation(); exportSingleOrderGroup(downloadGroupBtn.getAttribute('data-download-group')); return; }
+      const toggleEl = e.target.closest('[data-toggle]');
+      if (toggleEl) {
+        const orderNo = toggleEl.getAttribute('data-toggle');
+        collapsedGroups[orderNo] = !collapsedGroups[orderNo];
+        const groupEl = toggleEl.closest('.order-group');
+        if (groupEl) groupEl.classList.toggle('collapsed');
+        return;
+      }
+      const delBtn = e.target.closest('[data-del]');
+      if (delBtn) { deleteOrder(delBtn.getAttribute('data-del')); return; }
+      const viewBtn = e.target.closest('[data-view]');
+      if (viewBtn) { viewReceipts(viewBtn.getAttribute('data-view')); }
+    });
+
+    // 时间统计 tab 切换
+    els.timeTabs.addEventListener('click', function(e) {
+      const tab = e.target.closest('.time-tab');
+      if (!tab) return;
+      $$('#timeTabs .time-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      timeStatsPeriod = tab.getAttribute('data-period');
+      renderTimeStats();
+    });
+  }
+
+  /* ==================== 模态框 ==================== */
+  function openModal(id) { $(id).classList.add('show'); }
+  function closeModal(id) { $(id).classList.remove('show'); }
+
+  function bindModals() {
+    $$('[data-close]').forEach(btn => { btn.addEventListener('click', () => closeModal(btn.getAttribute('data-close'))); });
+    $$('.modal-overlay').forEach(overlay => { overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('show'); }); });
+    els.btnExportMenu.addEventListener('click', e => { e.stopPropagation(); els.exportMenu.classList.toggle('show'); });
+    document.addEventListener('click', () => els.exportMenu.classList.remove('show'));
+    els.exportMenu.addEventListener('click', e => e.stopPropagation());
+
+    els.exportMenu.querySelectorAll('[data-export]').forEach(item => {
+      item.addEventListener('click', function() {
+        const type = this.getAttribute('data-export');
+        els.exportMenu.classList.remove('show');
+        const filtered = getFilteredOrders();
+        const allVisible = getVisibleOrders();
+        switch (type) {
+          case 'csv-filtered': exportOrders(filtered, '订单筛选结果', 'csv'); break;
+          case 'excel-filtered': exportOrders(filtered, '订单筛选结果', 'excel'); break;
+          case 'csv-all': exportOrders(allVisible, '订单全部数据', 'csv'); break;
+          case 'excel-all': exportOrders(allVisible, '订单全部数据', 'excel'); break;
+          case 'stats-report': exportStatsReport(); break;
+          case 'time-report': exportTimeStatsReport(); break;
+        }
+      });
+    });
+
+    els.btnExport.addEventListener('click', () => exportOrders(getFilteredOrders(), '订单筛选结果', 'csv'));
+
+    els.btnStatsReport.addEventListener('click', () => {
+      currentReportType = 'all';
+      $$('#reportQuickChips .quick-chip').forEach(c => c.classList.remove('active'));
+      $$('#reportQuickChips .quick-chip')[0].classList.add('active');
+      renderStatsReport();
+      openModal('statsReportModal');
+    });
+    els.reportQuickChips.addEventListener('click', e => {
+      const chip = e.target.closest('.quick-chip');
+      if (!chip) return;
+      $$('#reportQuickChips .quick-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentReportType = chip.getAttribute('data-report');
+      renderStatsReport();
+    });
+    els.exportReportBtn.addEventListener('click', exportStatsReport);
+
+    els.btnAdvSearch.addEventListener('click', () => { renderSalespersonFilter(); openModal('advSearchModal'); });
+    els.runAdvSearchBtn.addEventListener('click', runAdvancedSearch);
+    els.resetAdvSearchBtn.addEventListener('click', resetAdvancedSearch);
+    els.btnPrint.addEventListener('click', printOrders);
+
+    els.manageUsersBtn.addEventListener('click', () => { renderUserList(); openModal('userManageModal'); });
+    els.addUserBtn.addEventListener('click', addNewUser);
+
+    els.editAddModelBtn.addEventListener('click', () => {
+      addEditModelRow();
+      const lastRow = els.editModelRowsContainer.lastElementChild;
+      if (lastRow) { lastRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); const carInput = lastRow.querySelector('.model-car'); if (carInput) setTimeout(() => carInput.focus(), 100); }
+    });
+    els.editAddPaymentBtn.addEventListener('click', () => {
+      addEditPaymentRow();
+      const lastRow = els.editPaymentRowsContainer.lastElementChild;
+      if (lastRow) { lastRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); const amtInput = lastRow.querySelector('.payment-amount'); if (amtInput) setTimeout(() => amtInput.focus(), 100); }
+    });
+    els.editReceiptFile.addEventListener('change', function() {
+      const files = Array.from(this.files || []);
+      if (files.length > 0) {
+        const preview = files.map(f => ({ fileName: f.name, fileSize: f.size }));
+        let html = preview.map(f => '<span class="file-chip" style="background:#fff3e0;color:#b06c00;border-color:#f0d99b;">📎 <span class="fname">' + escapeHtml(f.fileName) + '</span>（新）</span>').join('');
+        html += '<span style="font-size:11.5px; color:var(--warning); font-weight:600; padding:4px 8px;">↑ 保存时将替换原有水单</span>';
+        els.editFileNameDisplay.innerHTML = html;
+      } else renderExistingReceiptsPreview(els.editFileNameDisplay, editContext.originalReceipts);
+    });
+    els.saveEditOrderBtn.addEventListener('click', saveEditOrder);
+  }
+
+  /* ==================== 用户管理 ==================== */
+  function renderUserList() {
+    if (!state.users) state.users = defaultUsers();
+    const entries = Object.entries(state.users);
+    els.userListBody.innerHTML = entries.map(([username, user]) => {
+      const isSelf = currentUser && currentUser.username === username;
+      const isSuper = isSuperAdmin(username);
+      const isAdmin = user.role === 'admin';
+      let roleTag = '';
+      if (isSuper) roleTag = '<span class="role-tag super">🌟 超级管理员</span>';
+      else if (isAdmin) roleTag = '<span class="role-tag admin">👑 管理员</span>';
+      else roleTag = '<span class="role-tag editor">✏️ 业务员</span>';
+      const scope = user.viewScope || { type: 'all', excluded: [] };
+      let scopeTag = '';
+      if (scope.type === 'all' && (!scope.excluded || scope.excluded.length === 0)) scopeTag = '<span class="scope-tag">🌐 全部（含 cookie）</span>';
+      else if (scope.type === 'all') scopeTag = '<span class="scope-tag">🌐 除 ' + escapeHtml(scope.excluded.join('、')) + ' 外</span>';
+      else if (scope.type === 'self') scopeTag = '<span class="scope-tag">👤 仅自己</span>';
+      else if (scope.type === 'list') scopeTag = '<span class="scope-tag">📋 白名单（' + (scope.allowedSalespersons || []).length + '人）</span>';
+      const canDel = canDeleteUser(username);
+      const delBtn = canDel ? '<button class="danger" data-user-del="' + escapeAttr(username) + '">删除</button>'
+        : '<button disabled title="' + (isSelf ? '不能删除自己' : isSuper ? '不能删除超级管理员' : '不可删除') + '">删除</button>';
+      return '<tr class="user-list-row">' +
+        '<td style="font-weight:600;color:var(--primary);">' + escapeHtml(user.salesperson || '-') + (isSelf ? ' <span style="background:#e3f6ea;color:#1e7a4c;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700;">我</span>' : '') + '</td>' +
+        '<td style="font-family:monospace;color:var(--text-muted);">' + escapeHtml(username) + '</td>' +
+        '<td>' + roleTag + '</td>' +
+        '<td>' + scopeTag + '</td>' +
+        '<td><div class="actions"><button data-user-reset="' + escapeAttr(username) + '">重置密码</button>' + delBtn + '</div></td>' +
+      '</tr>';
+    }).join('');
+    els.userListBody.querySelectorAll('[data-user-del]').forEach(btn => btn.addEventListener('click', () => deleteUser(btn.getAttribute('data-user-del'))));
+    els.userListBody.querySelectorAll('[data-user-reset]').forEach(btn => btn.addEventListener('click', () => resetUserPassword(btn.getAttribute('data-user-reset'))));
+  }
+
+  function addNewUser() {
+    const role = els.newUserRole.value;
+    const username = els.newUserName.value.trim();
+    const salesperson = els.newSalesperson.value.trim();
+    const password = els.newPassword.value;
+    const passwordConfirm = els.newPasswordConfirm.value;
+    if (!username || !salesperson || !password || !passwordConfirm) { showToast('请填写完整信息', 'error'); return; }
+    if (password.length < 6) { showToast('密码至少6位', 'error'); return; }
+    if (password !== passwordConfirm) { showToast('两次密码输入不一致', 'error'); return; }
+    if (findUser(username)) { showToast('登录用户名已存在', 'error'); return; }
+    const existingNames = new Set(Object.values(state.users).map(u => u.salesperson).filter(Boolean));
+    if (existingNames.has(salesperson)) { showToast('业务员名称已存在', 'error'); return; }
+    let viewScope;
+    if (role === 'admin') viewScope = { type: 'all', excluded: ['cookie'] }; // 新增管理员默认排除 cookie
+    else viewScope = { type: 'self' };
+    state.users[username] = { password, role, salesperson, displayName: salesperson, avatar: makeAvatar(salesperson), viewScope };
+    saveToStorage(true, true);
+    els.newUserRole.value = 'editor';
+    els.newUserName.value = ''; els.newSalesperson.value = '';
+    els.newPassword.value = ''; els.newPasswordConfirm.value = '';
+    renderUserList();
+    renderAll();
+    const roleText = role === 'admin' ? '管理员' : '业务员';
+    showToast(roleText + '「' + salesperson + '」新增成功');
+  }
+  function deleteUser(username) {
+    if (!state.users[username]) return;
+    if (!canDeleteUser(username)) { showToast('该账号不可删除', 'error'); return; }
+    const user = state.users[username];
+    const roleText = user.role === 'admin' ? '管理员' : '业务员';
+    if (!confirm('确定删除' + roleText + '「' + user.salesperson + '」吗？\n\n注意：该账号名下已有的订单数据会保留，但无法再登录。')) return;
+    delete state.users[username];
+    saveToStorage(true, true);
+    renderUserList();
+    renderAll();
+    showToast('账号已删除');
+  }
+  function resetUserPassword(username) {
+    if (!state.users[username]) return;
+    const user = state.users[username];
+    const newPwd = prompt('为「' + user.salesperson + '」（登录名：' + username + '）设置新密码：\n（至少6位）', '');
+    if (newPwd === null) return;
+    if (!newPwd || newPwd.length < 6) { showToast('密码至少6位，操作已取消', 'error'); return; }
+    state.users[username].password = newPwd;
+    saveToStorage(true, true);
+    showToast('密码已更新');
+  }
+
+  function runAdvancedSearch() {
+    const orderNo = els.advOrderNo.value.trim().toLowerCase();
+    const sp = els.advSalesperson.value;
+    const customer = els.advCustomer.value.trim().toLowerCase();
+    const model = els.advModel.value.trim().toLowerCase();
+    const color = els.advColor.value.trim().toLowerCase();
+    const payment = els.advPayment.value;
+    const dateFrom = els.advDateFrom.value;
+    const dateTo = els.advDateTo.value;
+    const fobMin = els.advFobMin.value !== '' ? parseFloat(els.advFobMin.value) : null;
+    const fobMax = els.advFobMax.value !== '' ? parseFloat(els.advFobMax.value) : null;
+    const totalMin = els.advTotalMin.value !== '' ? parseFloat(els.advTotalMin.value) : null;
+    const totalMax = els.advTotalMax.value !== '' ? parseFloat(els.advTotalMax.value) : null;
+    const qtyMin = els.advQtyMin.value !== '' ? parseInt(els.advQtyMin.value, 10) : null;
+    const visible = getVisibleOrders();
+    const matched = visible.filter(o => {
+      if (orderNo && !(o.orderNo || '').toLowerCase().includes(orderNo)) return false;
+      if (sp && o.salesperson !== sp) return false;
+      if (customer && !(o.customerName || '').toLowerCase().includes(customer)) return false;
+      if (model && !(o.carModel || '').toLowerCase().includes(model)) return false;
+      if (color && !(o.color || '').toLowerCase().includes(color)) return false;
+      if (payment && o.paymentStatus !== payment) return false;
+      if (dateFrom && o.orderDate < dateFrom) return false;
+      if (dateTo && o.orderDate > dateTo) return false;
+      if (fobMin !== null && Number(o.fobPrice) < fobMin) return false;
+      if (fobMax !== null && Number(o.fobPrice) > fobMax) return false;
+      if (totalMin !== null && Number(o.totalPrice) < totalMin) return false;
+      if (totalMax !== null && Number(o.totalPrice) > totalMax) return false;
+      if (qtyMin !== null && Number(o.quantity) < qtyMin) return false;
+      return true;
+    });
+    els.filterOrderNo.value = els.advOrderNo.value.trim();
+    els.filterCustomer.value = els.advCustomer.value.trim();
+    els.filterModel.value = els.advModel.value.trim();
+    els.filterStartDate.value = dateFrom;
+    els.filterEndDate.value = dateTo;
+    if (currentRole === 'admin' && els.advSalesperson.value) els.filterSalesperson.value = els.advSalesperson.value;
+    else els.filterSalesperson.value = '';
+    renderStats();
+    renderTimeStats();
+    renderSalespersonStats();
+    renderOrderGroupsFromMatched(matched);
+    closeModal('advSearchModal');
+    showToast('查询完成，匹配 ' + matched.length + ' 条记录');
+  }
+  function renderOrderGroupsFromMatched(filtered) {
+    if (filtered.length === 0) {
+      els.orderGroupsContainer.innerHTML = '';
+      els.ordersNoData.classList.remove('hidden');
+      els.ordersNoData.innerHTML = '<span class="big">🔍</span>没有匹配的订单';
+      return;
+    }
+    els.ordersNoData.classList.add('hidden');
+    const originalGetFiltered = getFilteredOrders;
+    getFilteredOrders = function() { return filtered; };
+    try { renderOrderGroups(); } finally { getFilteredOrders = originalGetFiltered; }
+  }
+  function resetAdvancedSearch() {
+    els.advOrderNo.value = '';
+    if (currentRole === 'admin') els.advSalesperson.value = '';
+    els.advCustomer.value = ''; els.advModel.value = ''; els.advColor.value = '';
+    els.advPayment.value = ''; els.advDateFrom.value = ''; els.advDateTo.value = '';
+    els.advFobMin.value = ''; els.advFobMax.value = '';
+    els.advTotalMin.value = ''; els.advTotalMax.value = ''; els.advQtyMin.value = '';
+    showToast('查询条件已重置');
+  }
+
+  /* ==================== 设置 ==================== */
+  function bindSettings() {
+    els.settingsBtn.addEventListener('click', () => { renderJsonbinSettings(); openModal('settingsModal'); });
+    els.connectJsonbinBtn.addEventListener('click', connectJsonbin);
+    els.disconnectJsonbinBtn.addEventListener('click', disconnectJsonbin);
+    els.copyShareInfoBtn.addEventListener('click', () => {
+      if (!jsonbinApiKey || !jsonbinBinId) { showToast('请先连接 JSONBin', 'error'); return; }
+      const info = 'Master Key：' + jsonbinApiKey + '\nBin ID：' + jsonbinBinId;
+      navigator.clipboard.writeText(info).then(
+        () => showToast('分享信息已复制'),
+        () => {
+          const ta = document.createElement('textarea');
+          ta.value = info; document.body.appendChild(ta); ta.select();
+          document.execCommand('copy'); document.body.removeChild(ta);
+          showToast('分享信息已复制');
+        }
+      );
+    });
+    els.pullFromJsonbinBtn.addEventListener('click', async () => {
+      if (!jsonbinApiKey || !jsonbinBinId) { showToast('请先连接 JSONBin', 'error'); return; }
+      setJsonbinSyncInfo('正在拉取...');
+      await jsonbinPull();
+      setJsonbinSyncInfo('拉取完成 · ' + new Date().toLocaleTimeString());
+      showToast('已从 JSONBin 拉取最新数据');
+    });
+  }
+  function bindBroadcast() {
+    if (!bc) return;
+    bc.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'state-update') {
+        loadFromStorage();
+        if (currentUser) renderAll();
+      }
+    });
+  }
+
+  /* ==================== 初始化 ==================== */
+  function init() {
+    bindLogin(); bindForm(); bindFilters(); bindGroupEvents(); bindModals(); bindSettings(); bindBroadcast();
+    jsonbinApiKey = localStorage.getItem(JSONBIN_KEY) || '';
+    jsonbinBinId = localStorage.getItem(JSONBIN_BIN) || '';
+    if (jsonbinApiKey) els.jsonbinApiKey.value = jsonbinApiKey;
+    if (jsonbinBinId) els.jsonbinBinId.value = jsonbinBinId;
+    loadFromStorage();
+    const savedLogin = localStorage.getItem(LOGIN_KEY);
+    if (savedLogin) {
+      try {
+        const u = JSON.parse(savedLogin);
+        const found = findUser(u.username);
+        if (found) {
+          currentUser = { username: found.key, role: found.user.role, salesperson: found.user.salesperson, displayName: found.user.displayName || found.user.salesperson, avatar: found.user.avatar || makeAvatar(found.user.salesperson) };
+          currentRole = found.user.role;
+          currentSalesperson = found.user.salesperson;
+          enterMainApp();
+          if (jsonbinApiKey && jsonbinBinId) {
+            updateSyncStatus('syncing', '连接中...');
+            jsonbinPull().then(() => { updateSyncStatus('online', 'JSONBin 已连接'); setJsonbinSyncInfo('已连接'); startJsonbinPolling(); });
+          } else updateSyncStatus('', '本地模式');
+          return;
+        }
+      } catch (e) {}
+    }
+    els.mainApp.style.display = 'none';
+    els.loginOverlay.classList.remove('hidden');
+    setTimeout(() => els.loginUsername.focus(), 200);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+
+})();
+</script>
+</body>
+</html>
